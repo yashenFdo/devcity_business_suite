@@ -8,23 +8,24 @@ export default {
         mono: ['"JetBrains Mono Variable"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
-        // "Engineering blue" — the single brand accent used across the product
+        // DevCity blue (#1F5BFF) — the single brand accent used across the product
         primary: {
-          50: '#eef4ff',
-          100: '#dbe6fe',
-          200: '#bfd3fe',
-          300: '#93b4fd',
-          400: '#608dfa',
-          500: '#3b68f6',
-          600: '#2549eb',
-          700: '#1d39d8',
-          800: '#1e31af',
-          900: '#1e2f8a',
-          950: '#172054',
+          50: '#eef3ff',
+          100: '#dce6ff',
+          200: '#bed0ff',
+          300: '#90afff',
+          400: '#5b88ff',
+          500: '#3a6eff',
+          600: '#1f5bff',
+          700: '#1647d9',
+          800: '#163bad',
+          900: '#173587',
+          950: '#0f2152',
         },
+        // DevCity navy
         ink: {
-          DEFAULT: '#0b1220',
-          soft: '#1c2536',
+          DEFAULT: '#0b1b3f',
+          soft: '#16285a',
         },
       },
       fontSize: {
@@ -36,7 +37,7 @@ export default {
         'card-hover': '0 8px 24px -6px rgb(15 23 42 / 0.10), 0 2px 6px -2px rgb(15 23 42 / 0.06)',
         pop: '0 12px 32px -8px rgb(15 23 42 / 0.18), 0 4px 10px -4px rgb(15 23 42 / 0.08)',
         modal: '0 24px 64px -12px rgb(15 23 42 / 0.30)',
-        focus: '0 0 0 4px rgb(37 73 235 / 0.14)',
+        focus: '0 0 0 4px rgb(31 91 255 / 0.16)',
         paper: '0 1px 3px rgb(15 23 42 / 0.06), 0 12px 40px -8px rgb(15 23 42 / 0.16)',
       },
       borderRadius: {

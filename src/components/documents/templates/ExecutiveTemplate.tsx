@@ -63,7 +63,7 @@ const joinAddress = (parts: (string | undefined)[]) => parts.map((p) => p?.trim(
 
 export const ExecutiveTemplate: React.FC<{ data: DocumentData }> = ({ data }) => {
   const { company, customer, currencySymbol: cur } = data;
-  const accent = company.brandColor || '#2549eb';
+  const accent = company.brandColor || '#1F5BFF';
   const tint = `color-mix(in srgb, ${accent} 7%, white)`;
   const type = data.documentType;
   const isQuote = type === 'quotation';

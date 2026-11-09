@@ -28,7 +28,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { buildAlerts, effectiveBillStatus, effectiveInvoiceStatus, effectiveQuotationStatus, type AlertTone } from '../utils/insights';
 
-const SERIES = { invoiced: '#2549eb', collected: '#0d9488' };
+const SERIES = { invoiced: '#1F5BFF', collected: '#0d9488' };
 
 const greeting = () => {
   const h = new Date().getHours();

@@ -18,7 +18,7 @@ export const blankCompany = (name = ''): Company => ({
   bankDetails: { bankName: '', accountName: '', accountNumber: '', ifscCode: '', swiftCode: '', routingNumber: '' },
   currency: 'USD',
   currencySymbol: '$',
-  brandColor: '#2549eb',
+  brandColor: '#1F5BFF',
   footer: '',
 });
 

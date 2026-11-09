@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Check, ImagePlus, PenLine, Trash2 } from 'lucide-react';
+import { Check, ImagePlus, PenLine, Sparkles, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCompanyStore } from '../../store/useCompanyStore';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
@@ -16,14 +16,14 @@ const MAX_BYTES = 512 * 1024;
 const HEX = /^#[0-9a-f]{6}$/i;
 
 const COLOR_PRESETS = [
-  { name: 'Engineering blue', value: '#2549eb' },
+  { name: 'DevCity blue', value: '#1f5bff' },
+  { name: 'DevCity navy', value: '#0b1b3f' },
   { name: 'Indigo', value: '#4f46e5' },
   { name: 'Violet', value: '#7c3aed' },
   { name: 'Teal', value: '#0d9488' },
   { name: 'Emerald', value: '#047857' },
   { name: 'Crimson', value: '#be123c' },
   { name: 'Bronze', value: '#b45309' },
-  { name: 'Graphite', value: '#0f172a' },
 ];
 
 /** Validates type, size and that the file really decodes as an image. */
@@ -151,17 +151,33 @@ export const BrandingSettings: React.FC = () => {
   const company = useCompanyStore((s) => s.company);
   const updateCompany = useCompanyStore((s) => s.updateCompany);
   const [form, setForm] = useState<Company>(company);
-  const [hexDraft, setHexDraft] = useState(company.brandColor || '#2549eb');
+  const [hexDraft, setHexDraft] = useState(company.brandColor || '#1f5bff');
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(company), [form, company]);
   useUnsavedChangesWarning(dirty);
   const set = <K extends keyof Company>(key: K, value: Company[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const color = form.brandColor || '#2549eb';
+  const color = form.brandColor || '#1f5bff';
   const template = form.defaultTemplate || DEFAULT_TEMPLATE;
 
   const setColor = (c: string) => {
     setHexDraft(c);
     if (HEX.test(c)) set('brandColor', c.toLowerCase());
+  };
+
+  const applyOfficialLogo = async () => {
+    try {
+      const blob = await (await fetch('/brand/devcity-logo-document.png')).blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('read failed'));
+        reader.readAsDataURL(blob);
+      });
+      set('logo', dataUrl);
+      setColor('#1f5bff');
+    } catch {
+      toast.error('Could not load the DevCity logo.');
+    }
   };
 
   const save = () => {
@@ -180,7 +196,12 @@ export const BrandingSettings: React.FC = () => {
       <div className="space-y-6">
         <SettingsCard title="Logo & signature" description="PNG, JPG or WebP up to 512 KB. Transparent backgrounds look best.">
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <ImageSlot label="Company logo" hint="Recommended 600 × 160 px" icon={ImagePlus} value={form.logo} onChange={(v) => set('logo', v)} />
+            <div>
+              <ImageSlot label="Company logo" hint="Recommended 600 × 160 px" icon={ImagePlus} value={form.logo} onChange={(v) => set('logo', v)} />
+              <button type="button" className="btn-ghost btn-sm -ml-2 mt-2 text-primary-700 hover:bg-primary-50" onClick={() => void applyOfficialLogo()}>
+                <Sparkles size={14} /> Use the official DevCity logo &amp; colour
+              </button>
+            </div>
             <ImageSlot
               label="Authorised signature"
               hint="Shown on invoices, receipts & quotes"
@@ -289,7 +310,7 @@ export const BrandingSettings: React.FC = () => {
         onSave={save}
         onDiscard={() => {
           setForm(company);
-          setHexDraft(company.brandColor || '#2549eb');
+          setHexDraft(company.brandColor || '#1f5bff');
         }}
       />
     </div>
