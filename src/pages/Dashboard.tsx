@@ -26,7 +26,7 @@ import { useSession, useCan } from '../security/sessionState';
 import { StatusBadge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { buildAlerts, effectiveBillStatus, effectiveInvoiceStatus, effectiveQuotationStatus, type AlertTone } from '../utils/insights';
+import { buildAlerts, joinRequestAlerts, effectiveBillStatus, effectiveInvoiceStatus, effectiveQuotationStatus, type AlertTone } from '../utils/insights';
 
 const SERIES = { invoiced: '#1F5BFF', collected: '#0d9488' };
 
@@ -147,7 +147,11 @@ export const Dashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, receipts, home]);
 
-  const alerts = useMemo(() => buildAlerts(invoices, quotations, bills).slice(0, 6), [invoices, quotations, bills]);
+  const joinRequests = useAccessStore((s) => s.joinRequests);
+  const alerts = useMemo(
+    () => [...(isAdmin ? joinRequestAlerts(joinRequests) : []), ...buildAlerts(invoices, quotations, bills)].slice(0, 6),
+    [isAdmin, joinRequests, invoices, quotations, bills]
+  );
 
   const recent = useMemo(
     () =>
@@ -358,7 +362,7 @@ export const Dashboard: React.FC = () => {
             <div className="card-header">
               <div>
                 <h2 className="card-title">Needs attention</h2>
-                <p className="card-subtitle">Overdue invoices, due bills and expiring quotes</p>
+                <p className="card-subtitle">Join requests, overdue invoices, due bills and expiring quotes</p>
               </div>
             </div>
             {alerts.length === 0 ? (

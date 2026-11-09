@@ -90,6 +90,18 @@ const onMembersChanged = async () => {
   if (me.role === 'admin') await loadAdminData().catch(() => undefined);
 };
 
+/** Admins: reload the join queue; announce brand-new requests. */
+export const refreshJoinQueue = async (announce = false) => {
+  if (useSession.getState().user?.role !== 'admin') return;
+  const before = new Set(useAccessStore.getState().joinRequests.map((r) => r.id));
+  await loadAdminData().catch(() => undefined);
+  if (!announce) return;
+  const fresh = useAccessStore.getState().joinRequests.filter((r) => !before.has(r.id));
+  for (const r of fresh) {
+    toast(`${r.name} wants to join. Review in Settings → Team & access.`, { icon: '👋', duration: 8000 });
+  }
+};
+
 export const enterWorkspace = async (wsId: string) => {
   const s = useSession.getState();
   if (!s.user) return;
@@ -109,6 +121,7 @@ export const enterWorkspace = async (wsId: string) => {
     subscribeWorkspace(wsId, {
       onMembersChanged: () => void onMembersChanged(),
       onWorkspaceChanged: () => void loadWorkspaceRow(wsId).catch(() => undefined),
+      onJoinRequestsChanged: (isNew) => void refreshJoinQueue(isNew),
     });
     void supabase.rpc('touch_last_seen', { p_workspace: wsId });
     useSession.setState({ status: 'ready', workspace: { id: row.id, name: row.name } });

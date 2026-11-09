@@ -4,7 +4,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { CommandPalette } from './CommandPalette';
-import { lockWorkspace } from '../../security/session';
+import { lockWorkspace, refreshJoinQueue } from '../../security/session';
+import { useSession } from '../../security/sessionState';
 
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
@@ -16,6 +17,21 @@ export const AppLayout: React.FC = () => {
 
   // Editors render full-bleed; everything else gets standard page padding.
   const fullBleed = /\/(new|edit)$/.test(pathname);
+
+  // Join requests also arrive live (Realtime); this is a safety net.
+  const isAdmin = useSession((s) => s.user?.role === 'admin');
+  useEffect(() => {
+    if (!isAdmin) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void refreshJoinQueue(true);
+    };
+    const timer = setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [isAdmin]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, parseISO, isValid } from 'date-fns';
 import type { Bill, Invoice, Quotation } from '../types';
+import type { JoinRequest } from '../store/useAccessStore';
 
 const daysUntil = (dateStr?: string): number | null => {
   if (!dateStr) return null;
@@ -93,3 +94,13 @@ export const dueLabel = (dateStr?: string): { text: string; tone: 'muted' | 'war
   if (d <= 7) return { text: `Due in ${plural(d, 'day')}`, tone: 'warning' };
   return { text: `Due in ${plural(d, 'day')}`, tone: 'muted' };
 };
+
+/** Admin alerts for people waiting to join the workspace. */
+export const joinRequestAlerts = (requests: JoinRequest[]): WorkspaceAlert[] =>
+  requests.map((r) => ({
+    id: `join-${r.id}`,
+    tone: 'warning' as const,
+    title: `${r.name} wants to join`,
+    detail: r.message ? `“${r.message}”` : `${r.email} · approve or decline`,
+    link: '/settings/team#join-requests',
+  }));

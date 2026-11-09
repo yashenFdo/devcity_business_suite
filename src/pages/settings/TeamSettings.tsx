@@ -1,5 +1,5 @@
-import React, { useId, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useId, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Check,
   Copy,
@@ -30,7 +30,7 @@ import {
   setJoinCodeEnabled,
   updateMember,
 } from '../../cloud/team';
-import { leaveWorkspace } from '../../security/session';
+import { leaveWorkspace, refreshJoinQueue } from '../../security/session';
 import { useCan, useSession } from '../../security/sessionState';
 import { ROLE_META, type Role } from '../../security/permissions';
 import { useAccessStore, type EmploymentStatus, type Invitation, type TeamMember } from '../../store/useAccessStore';
@@ -842,6 +842,25 @@ const LeaveCard: React.FC = () => {
 export const TeamSettings: React.FC = () => {
   const isAdmin = useCan('users.manage');
   const requestCount = useAccessStore((s) => s.joinRequests.length);
+  const { hash } = useLocation();
+
+  // Always show the latest queue when the page opens.
+  useEffect(() => {
+    void refreshJoinQueue();
+  }, []);
+
+  // Links like /settings/team#join-requests (from notifications) scroll to the queue.
+  useEffect(() => {
+    if (hash !== '#join-requests') return;
+    const t = setTimeout(() => document.getElementById('join-requests')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    return () => clearTimeout(t);
+  }, [hash, requestCount]);
+
+  const requestsCard = isAdmin && (
+    <div id="join-requests" className="scroll-mt-6">
+      <JoinRequestsCard />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -860,13 +879,10 @@ export const TeamSettings: React.FC = () => {
           </span>
         </button>
       )}
+      {requestCount > 0 && requestsCard}
       {isAdmin && <InviteCard />}
       {isAdmin && <InviteCodeCard />}
-      {isAdmin && (
-        <div id="join-requests" className="scroll-mt-6">
-          <JoinRequestsCard />
-        </div>
-      )}
+      {requestCount === 0 && requestsCard}
       {isAdmin && <PendingInvitationsCard />}
       <MembersCard />
       <LeaveCard />

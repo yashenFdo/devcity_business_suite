@@ -3,6 +3,7 @@ import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Building2, History, Palette, ShieldCheck, Users } from 'lucide-react';
 import { useSession } from '../../security/sessionState';
 import { roleCan, type Permission } from '../../security/permissions';
+import { useAccessStore } from '../../store/useAccessStore';
 
 const ITEMS: { to: string; label: string; icon: React.ElementType; end?: boolean; permission?: Permission; hint: string }[] = [
   { to: '/settings', end: true, label: 'Company profile', icon: Building2, permission: 'settings.manage', hint: 'Legal details, address & bank' },
@@ -16,6 +17,7 @@ export const SettingsLayout: React.FC = () => {
   const role = useSession((s) => s.user?.role);
   const { pathname } = useLocation();
   const items = ITEMS.filter((i) => !i.permission || roleCan(role, i.permission));
+  const waiting = useAccessStore((s) => s.joinRequests.length);
 
   // Non-admins land on the first page they can access.
   if (pathname === '/settings' && !roleCan(role, 'settings.manage')) {
@@ -49,6 +51,11 @@ export const SettingsLayout: React.FC = () => {
                       <span>
                         <span className={`block text-[13px] font-medium ${isActive ? 'text-slate-900' : 'text-slate-600'}`}>
                           {item.label}
+                          {item.to === '/settings/team' && waiting > 0 && (
+                            <span className="ml-2 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold leading-4 text-amber-800">
+                              {waiting} waiting
+                            </span>
+                          )}
                         </span>
                         <span className="hidden text-xs text-slate-400 lg:block">{item.hint}</span>
                       </span>

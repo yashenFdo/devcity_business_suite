@@ -152,6 +152,8 @@ const SidebarContent: React.FC<{ onNavigate: () => void }> = ({ onNavigate }) =>
   const canCreate = useCan('documents.create');
   const canRecordPayments = useCan('payments.record');
   const autoLock = useAccessStore((s) => s.policy.autoLockMinutes);
+  const isAdmin = useCan('users.manage');
+  const waiting = useAccessStore((s) => s.joinRequests.length);
   const overdue = useInvoicesStore((s) => s.invoices.filter((i) => effectiveInvoiceStatus(i) === 'overdue').length);
 
   const createActions = CREATE_ACTIONS.filter((a) => (a.label === 'Receipt' ? canRecordPayments : canCreate));
@@ -226,7 +228,7 @@ const SidebarContent: React.FC<{ onNavigate: () => void }> = ({ onNavigate }) =>
         <NavGroup
           title="Workspace"
           onNavigate={onNavigate}
-          items={[{ label: 'Settings', icon: Settings, to: '/settings' }]}
+          items={[{ label: 'Settings', icon: Settings, to: '/settings', badge: isAdmin ? waiting : 0 }]}
         />
       </nav>
 

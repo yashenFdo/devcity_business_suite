@@ -5,7 +5,9 @@ import { Dropdown } from '../ui/Dropdown';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
 import { useQuotationsStore } from '../../store/useQuotationsStore';
 import { useBillsStore } from '../../store/useBillsStore';
-import { buildAlerts, type AlertTone } from '../../utils/insights';
+import { buildAlerts, joinRequestAlerts, type AlertTone } from '../../utils/insights';
+import { useAccessStore } from '../../store/useAccessStore';
+import { useCan } from '../../security/sessionState';
 import { lockWorkspace } from '../../security/session';
 
 const SECTIONS: { path: string; label: string }[] = [
@@ -49,7 +51,12 @@ const Notifications: React.FC = () => {
   const invoices = useInvoicesStore((s) => s.invoices);
   const quotations = useQuotationsStore((s) => s.quotations);
   const bills = useBillsStore((s) => s.bills);
-  const alerts = useMemo(() => buildAlerts(invoices, quotations, bills), [invoices, quotations, bills]);
+  const joinRequests = useAccessStore((s) => s.joinRequests);
+  const isAdmin = useCan('users.manage');
+  const alerts = useMemo(
+    () => [...(isAdmin ? joinRequestAlerts(joinRequests) : []), ...buildAlerts(invoices, quotations, bills)],
+    [isAdmin, joinRequests, invoices, quotations, bills]
+  );
   const urgent = alerts.filter((a) => a.tone !== 'info').length;
 
   return (

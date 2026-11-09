@@ -185,6 +185,8 @@ let channel: RealtimeChannel | null = null;
 interface RealtimeHandlers {
   onMembersChanged: () => void;
   onWorkspaceChanged: () => void;
+  /** Admins only (RLS): someone asked to join, or a request was handled. */
+  onJoinRequestsChanged: (isNew: boolean) => void;
 }
 
 export const subscribeWorkspace = (ws: string, handlers: RealtimeHandlers) => {
@@ -210,6 +212,9 @@ export const subscribeWorkspace = (ws: string, handlers: RealtimeHandlers) => {
     )
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'workspaces', filter: `id=eq.${ws}` }, () =>
       handlers.onWorkspaceChanged()
+    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests', filter: `workspace_id=eq.${ws}` }, (payload) =>
+      handlers.onJoinRequestsChanged(payload.eventType === 'INSERT')
     )
     .subscribe();
 };
