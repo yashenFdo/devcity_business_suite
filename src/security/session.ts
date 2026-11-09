@@ -153,6 +153,27 @@ const bootstrap = async (u: User) => {
   }
 };
 
+/**
+ * OAuth / email-link failures come back as ?error_description=… (or in the #hash).
+ * Show them instead of silently landing on the sign-in screen, then tidy the address bar.
+ */
+const reportAuthErrorFromUrl = () => {
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const description = query.get('error_description') ?? hash.get('error_description');
+  if (!description && !query.get('error') && !hash.get('error')) return;
+  window.history.replaceState(null, '', window.location.pathname);
+  const text = (description ?? '').replace(/\+/g, ' ');
+  const message = /exchange external code/i.test(text)
+    ? 'Google sign-in failed: the Google client secret configured in Supabase is not valid. An administrator needs to update it under Authentication → Providers → Google.'
+    : /expired|invalid/i.test(text) && /link|otp|token/i.test(text)
+      ? 'That sign-in link has expired or was already used. Please request a new one.'
+      : /access_denied|cancel/i.test(text + (query.get('error') ?? ''))
+        ? 'Sign-in was cancelled.'
+        : `Sign-in failed: ${text || 'unknown error'}`;
+  toast.error(message, { duration: 10_000 });
+};
+
 let started = false;
 let bootedFor: string | null = null;
 
@@ -163,6 +184,7 @@ export const initSession = async () => {
     useSession.setState({ status: 'unconfigured' });
     return;
   }
+  reportAuthErrorFromUrl();
   supabase.auth.onAuthStateChange((event, session) => {
     // Deferred: supabase-js recommends not awaiting other Supabase calls inside this callback.
     setTimeout(() => {
