@@ -11,7 +11,11 @@ export interface RowAction {
 }
 
 /** "⋯" menu for table rows. Stops click propagation so row-click navigation isn't triggered. */
-export const RowActions: React.FC<{ actions: RowAction[]; label?: string }> = ({ actions, label = 'Actions' }) => {
+export const RowActions: React.FC<{ actions: RowAction[]; label?: string; size?: 'sm' | 'lg' }> = ({
+  actions,
+  label = 'Actions',
+  size = 'sm',
+}) => {
   const visible = actions.filter((a) => !a.hidden);
   if (visible.length === 0) return null;
   return (
@@ -19,7 +23,7 @@ export const RowActions: React.FC<{ actions: RowAction[]; label?: string }> = ({
       <Dropdown
         panelClassName="w-48"
         trigger={({ toggle, open }) => (
-          <button type="button" onClick={toggle} aria-expanded={open} aria-label={label} className="btn-icon btn-ghost h-7 w-7">
+          <button type="button" onClick={toggle} aria-expanded={open} aria-label={label} className={`btn-icon btn-ghost ${size === 'lg' ? 'h-10 w-10' : 'h-7 w-7'}`}>
             <MoreHorizontal size={16} />
           </button>
         )}

@@ -175,7 +175,7 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({
               onChange={(e) => update(index, { description: e.target.value })}
               aria-label={`Item ${index + 1} description`}
             />
-            <div className="flex flex-shrink-0 items-center opacity-100 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+            <div className="hidden flex-shrink-0 items-center opacity-100 transition-opacity sm:flex md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
               <button type="button" className="btn-icon btn-ghost h-7 w-7" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Move up">
                 <ArrowUp size={14} />
               </button>
@@ -202,7 +202,7 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({
             </div>
           </div>
 
-          <div className={`mt-2.5 grid grid-cols-2 gap-2.5 pl-[30px] sm:grid-cols-3 ${showTax ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
+          <div className={`mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:pl-[30px] ${showTax ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
             <NumberCell label="Qty" value={item.quantity} onChange={(n) => update(index, { quantity: n })} />
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-slate-500">Unit</span>
@@ -223,6 +223,32 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({
                 {formatCurrency(item.amount, currencySymbol)}
               </span>
             </div>
+          </div>
+          {/* Phones: item actions get their own row so the description keeps the full width */}
+          <div className="mt-2.5 flex items-center justify-end gap-1 border-t border-slate-100 pt-2 sm:hidden">
+              <button type="button" className="btn-icon btn-ghost h-9 w-9" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Move up">
+                <ArrowUp size={14} />
+              </button>
+              <button
+                type="button"
+                className="btn-icon btn-ghost h-9 w-9"
+                onClick={() => move(index, 1)}
+                disabled={index === items.length - 1}
+                aria-label="Move down"
+              >
+                <ArrowDown size={14} />
+              </button>
+              <button type="button" className="btn-icon btn-ghost h-9 w-9" onClick={() => duplicate(index)} aria-label="Duplicate item">
+                <Copy size={13} />
+              </button>
+              <button
+                type="button"
+                className="btn-icon btn-ghost h-9 w-9 hover:bg-rose-50 hover:text-rose-600"
+                onClick={() => remove(index)}
+                aria-label="Remove item"
+              >
+                <Trash2 size={14} />
+              </button>
           </div>
         </div>
       ))}

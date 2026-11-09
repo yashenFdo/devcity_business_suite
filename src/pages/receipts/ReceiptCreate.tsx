@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Check, FileText, Info, Loader2, Mail, Pencil, Printer, Receipt as ReceiptIcon, Search, Wallet } from 'lucide-react';
+import { Check, FileText, Info, Mail, Pencil, Receipt as ReceiptIcon, Search, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useReceiptsStore } from '../../store/useReceiptsStore';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
@@ -14,6 +14,9 @@ import { Field, FormSection } from '../../components/documents/editor/FormSectio
 import { ClientFields } from '../../components/documents/editor/ClientFields';
 import { emptyCustomer } from '../../components/documents/editor/clientUtils';
 import { useSaveShortcut, useUnsavedChangesWarning } from '../../components/documents/editor/useEditorGuards';
+import { useDraftAutosave, useDraftKey } from '../../components/documents/editor/useDraftAutosave';
+import { useSaveFeedback } from '../../components/documents/editor/useSaveFeedback';
+import { DraftBanner } from '../../components/documents/editor/DraftBanner';
 import { useDocumentPrint } from '../../components/documents/useDocumentPrint';
 import { PAYMENT_METHOD_OPTIONS } from '../../components/documents/paymentMethods';
 import { DEFAULT_TEMPLATE } from '../../components/documents/templateOptions';
@@ -113,6 +116,17 @@ const newReceipt = (company: Company, existingNumbers: string[]): ReceiptForm =>
   signOff: defaultSignOff(company),
 });
 
+/** One-line hint at what an autosaved draft contains, e.g. "Acme Corp · $4,200.00". */
+const draftDetail = (d: ReceiptForm): string | undefined => {
+  try {
+    const amount = parseFloat(d.amount);
+    const payer = clientLabel(d.customer);
+    return [payer, amount > 0 ? formatCurrency(amount, d.currencySymbol) : ''].filter(Boolean).join(' · ') || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /** Route wrapper: remounts the editor when switching between documents. */
 export const ReceiptCreate: React.FC<{ editMode?: boolean }> = ({ editMode = false }) => {
   const { id } = useParams<{ id: string }>();
@@ -148,13 +162,30 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   });
   const [form, setForm] = useState<ReceiptForm>(initial);
   const [submitted, setSubmitted] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [editPayer, setEditPayer] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const set = <K extends keyof ReceiptForm>(key: K, value: ReceiptForm[K]) => setForm((f) => ({ ...f, [key]: value }));
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
-  useUnsavedChangesWarning(dirty && !saving);
+  const feedback = useSaveFeedback();
+  const draft = useDraftAutosave(useDraftKey('receipt', !editId), form, initial);
+  useUnsavedChangesWarning(dirty && !feedback.busy);
+
+  const restoreDraft = () => {
+    const restored = draft.takeDraft();
+    if (!restored) return;
+    let d = restored;
+    // The linked invoice may have been paid or voided since the draft was written.
+    const linkedInvoice = d.linkedInvoiceId ? invoices.find((i) => i.id === d.linkedInvoiceId) : undefined;
+    const unlinked = !!d.linkedInvoiceId && !(linkedInvoice && isOpenInvoice(linkedInvoice));
+    if (unlinked) d = { ...d, linkedInvoiceId: '', linkedInvoiceNumber: '', amount: '' };
+    // Someone may have used the draft's number since — keep the fresh one then.
+    const taken = receipts.some((r) => r.receiptNumber === d.receiptNumber.trim());
+    if (taken) d = { ...d, receiptNumber: initial.receiptNumber };
+    setForm(d);
+    if (unlinked) toast(`Draft restored — ${restored.linkedInvoiceNumber || 'its invoice'} is no longer open, so choose the invoice again.`);
+    else toast.success(taken ? `Draft restored · renumbered to ${initial.receiptNumber}` : 'Draft restored');
+  };
 
   // ── Derived values ────────────────────────────────────────
   const linked = form.source === 'invoice' && !!form.linkedInvoiceId;
@@ -215,12 +246,12 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   const handlePrint = useDocumentPrint(printRef, form.receiptNumber || 'Receipt');
 
   const save = () => {
+    if (feedback.busy) return;
     setSubmitted(true);
     if (hasErrors) {
       toast.error('Please fix the highlighted fields.');
       return;
     }
-    setSaving(true);
     const payload = {
       receiptNumber: form.receiptNumber.trim(),
       date: form.date,
@@ -245,17 +276,18 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
         // editing only updates the receipt, so it's never counted twice.
         updateReceipt(existing.id, payload);
         toast.success(`${payload.receiptNumber} saved`);
-        navigate(`/receipts/${existing.id}`);
+        feedback.succeed('save', () => navigate(`/receipts/${existing.id}`));
       } else {
         if (linked && invoice) markAsPaid(invoice.id, amount);
         const created = addReceipt(payload);
+        draft.clear();
         toast.success(
           linked ? `Payment recorded on ${form.linkedInvoiceNumber} · ${created.receiptNumber} issued` : `${created.receiptNumber} issued`
         );
-        navigate(`/receipts/${created.id}`);
+        feedback.succeed('issue', () => navigate(`/receipts/${created.id}`));
       }
     } catch {
-      setSaving(false);
+      // The store already explained the failure (e.g. missing permission).
     }
   };
 
@@ -306,28 +338,27 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       onCurrencyChange={
         linked ? undefined : (c) => setForm((f) => ({ ...f, currency: c, currencySymbol: SUPPORTED_CURRENCIES[c].symbol }))
       }
-      actions={
-        <>
-          <button type="button" className="btn-ghost btn-sm hidden md:inline-flex" onClick={() => handlePrint()}>
-            <Printer size={15} /> Preview PDF
-          </button>
-          <button type="button" className="btn-primary btn-sm" onClick={save} disabled={saving}>
-            {saving ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : existing ? (
-              <Check size={15} />
-            ) : (
-              <ReceiptIcon size={15} />
-            )}
-            {existing ? 'Save changes' : 'Issue receipt'}
-          </button>
-        </>
-      }
-      footer={
-        <p className="px-1 text-center text-xs text-slate-400">
-          {dirty ? 'Unsaved changes' : existing ? `Last saved ${formatDate(existing.updatedAt, 'dd MMM yyyy, HH:mm')}` : 'Not saved yet'} ·
-          Press <span className="kbd">Ctrl</span> <span className="kbd">S</span> to save
-        </p>
+      actions={[
+        existing
+          ? { id: 'save', label: 'Save changes', icon: Check, onClick: save, primary: true }
+          : { id: 'issue', label: 'Issue receipt', icon: ReceiptIcon, onClick: save, primary: true },
+      ]}
+      saved={feedback.saved}
+      onPrint={() => handlePrint()}
+      summary={{ label: 'Amount', value: formatCurrency(amount, sym) }}
+      dirty={dirty}
+      onDiscard={draft.clear}
+      lastSavedAt={existing?.updatedAt}
+      autosaves={!existing}
+      banner={
+        draft.draft && (
+          <DraftBanner
+            savedAtLabel={draft.draft.savedAtLabel}
+            detail={draftDetail(draft.draft.form)}
+            onRestore={restoreDraft}
+            onDiscard={draft.discardDraft}
+          />
+        )
       }
       form={
         <>

@@ -36,11 +36,14 @@ const ActivityLog = lazy(() => import('./pages/settings/ActivityLog').then((m) =
 const create = (el: ReactNode) => <RequirePermission permission="documents.create">{el}</RequirePermission>;
 const edit = (el: ReactNode) => <RequirePermission permission="documents.edit">{el}</RequirePermission>;
 
+// Phones/tablets have bottom bars (tab bar, editor actions): show toasts at the top there.
+const isCompact = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
+
 function App() {
   return (
     <>
       <Toaster
-        position="bottom-right"
+        position={isCompact ? 'top-center' : 'bottom-right'}
         gutter={10}
         toastOptions={{
           duration: 3500,

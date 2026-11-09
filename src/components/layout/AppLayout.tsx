@@ -99,8 +99,9 @@ export const AppLayout: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [navigate]);
 
+  // 100dvh keeps content clear of mobile browser toolbars; h-screen is the fallback.
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-slate-50" style={{ height: '100dvh' }}>
       <Sidebar mobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white lg:bg-slate-50">
         <OfflineBanner />

@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Check, FileText, Loader2, Printer, Send } from 'lucide-react';
+import { Check, FileText, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useQuotationsStore } from '../../store/useQuotationsStore';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
@@ -17,6 +17,9 @@ import { Field, FormSection } from '../../components/documents/editor/FormSectio
 import { ClientFields } from '../../components/documents/editor/ClientFields';
 import { emptyCustomer } from '../../components/documents/editor/clientUtils';
 import { useSaveShortcut, useUnsavedChangesWarning } from '../../components/documents/editor/useEditorGuards';
+import { useDraftAutosave, useDraftKey } from '../../components/documents/editor/useDraftAutosave';
+import { useSaveFeedback } from '../../components/documents/editor/useSaveFeedback';
+import { DraftBanner } from '../../components/documents/editor/DraftBanner';
 import { useDocumentPrint } from '../../components/documents/useDocumentPrint';
 import { DEFAULT_TEMPLATE } from '../../components/documents/templateOptions';
 import type { DocumentData } from '../../components/documents/documentTypes';
@@ -26,7 +29,7 @@ import type { Company, Customer, CurrencyCode, DiscountType, LineItem, Quotation
 import { SUPPORTED_CURRENCIES } from '../../types';
 import { generateId, generateQuotationNumber } from '../../utils/documentNumber';
 import { calculateDocumentTotals } from '../../utils/calculations';
-import { addDays, formatDate, today } from '../../utils/formatters';
+import { addDays, formatCurrency, today } from '../../utils/formatters';
 import { daysBetween } from './quotationDocument';
 
 interface QuotationForm {
@@ -108,6 +111,17 @@ const newQuotation = (company: Company, existingNumbers: string[]): QuotationFor
   signOff: defaultSignOff(company),
 });
 
+/** One-line hint at what an autosaved draft contains, e.g. "Acme Corp · $4,200.00". */
+const draftDetail = (d: QuotationForm): string | undefined => {
+  try {
+    const client = d.customer.company || d.customer.name;
+    const { total } = calculateDocumentTotals(d.lineItems, d.discountValue, d.taxPercent, d.discountType);
+    return [client, total > 0 ? formatCurrency(total, d.currencySymbol) : ''].filter(Boolean).join(' · ') || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /** Route wrapper: remounts the editor when switching between documents. */
 export const QuotationCreate: React.FC<{ editMode?: boolean }> = ({ editMode = false }) => {
   const { id } = useParams<{ id: string }>();
@@ -137,12 +151,22 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   });
   const [form, setForm] = useState<QuotationForm>(initial);
   const [submitted, setSubmitted] = useState(false);
-  const [saving, setSaving] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const set = <K extends keyof QuotationForm>(key: K, value: QuotationForm[K]) => setForm((f) => ({ ...f, [key]: value }));
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
-  useUnsavedChangesWarning(dirty && !saving);
+  const feedback = useSaveFeedback();
+  const draft = useDraftAutosave(useDraftKey('quotation', !editId), form, initial);
+  useUnsavedChangesWarning(dirty && !feedback.busy);
+
+  const restoreDraft = () => {
+    const d = draft.takeDraft();
+    if (!d) return;
+    // Someone may have used the draft's number since — keep the fresh one then.
+    const taken = quotations.some((q) => q.quotationNumber === d.quotationNumber);
+    setForm(taken ? { ...d, quotationNumber: initial.quotationNumber } : d);
+    toast.success(taken ? `Draft restored · renumbered to ${initial.quotationNumber}` : 'Draft restored');
+  };
 
   const totals = calculateDocumentTotals(form.lineItems, form.discountValue, form.taxPercent, form.discountType);
   const validDays = daysBetween(form.date, form.validUntil);
@@ -187,12 +211,12 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   const handlePrint = useDocumentPrint(printRef, form.quotationNumber || 'Quotation');
 
   const save = (issue = false) => {
+    if (feedback.busy) return;
     setSubmitted(true);
     if (hasErrors) {
       toast.error('Please fix the highlighted fields.');
       return;
     }
-    setSaving(true);
     const status: Quotation['status'] = issue && form.status === 'draft' ? 'sent' : form.status;
     const payload = {
       quotationNumber: form.quotationNumber,
@@ -222,14 +246,15 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       if (existing) {
         updateQuotation(existing.id, payload);
         toast.success(`${form.quotationNumber} saved`);
-        navigate(`/quotations/${existing.id}`);
+        feedback.succeed('save', () => navigate(`/quotations/${existing.id}`));
       } else {
         const created = addQuotation(payload);
+        draft.clear();
         toast.success(issue ? `${created.quotationNumber} created and marked as sent` : `${created.quotationNumber} saved as draft`);
-        navigate(`/quotations/${created.id}`);
+        feedback.succeed(issue ? 'issue' : 'draft', () => navigate(`/quotations/${created.id}`));
       }
     } catch {
-      setSaving(false);
+      // The store already explained the failure (e.g. missing permission).
     }
   };
 
@@ -254,31 +279,29 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       currency={form.currency}
       onCurrencyChange={(c) => setForm((f) => ({ ...f, currency: c, currencySymbol: SUPPORTED_CURRENCIES[c].symbol }))}
       actions={
-        <>
-          <button type="button" className="btn-ghost btn-sm hidden md:inline-flex" onClick={() => handlePrint()}>
-            <Printer size={15} /> Preview PDF
-          </button>
-          {existing ? (
-            <button type="button" className="btn-primary btn-sm" onClick={() => save(false)} disabled={saving}>
-              {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Save changes
-            </button>
-          ) : (
-            <>
-              <button type="button" className="btn-secondary btn-sm" onClick={() => save(false)} disabled={saving}>
-                Save draft
-              </button>
-              <button type="button" className="btn-primary btn-sm" onClick={() => save(true)} disabled={saving}>
-                <Send size={14} /> <span className="hidden sm:inline">Save &</span> issue
-              </button>
-            </>
-          )}
-        </>
+        existing
+          ? [{ id: 'save', label: 'Save changes', icon: Check, onClick: () => save(false), primary: true }]
+          : [
+              { id: 'draft', label: 'Save draft', icon: FileText, onClick: () => save(false) },
+              { id: 'issue', label: 'Save & issue', shortLabel: 'Issue', icon: Send, onClick: () => save(true), primary: true },
+            ]
       }
-      footer={
-        <p className="px-1 text-center text-xs text-slate-400">
-          {dirty ? 'Unsaved changes' : existing ? `Last saved ${formatDate(existing.updatedAt, 'dd MMM yyyy, HH:mm')}` : 'Not saved yet'} ·
-          Press <span className="kbd">Ctrl</span> <span className="kbd">S</span> to save
-        </p>
+      saved={feedback.saved}
+      onPrint={() => handlePrint()}
+      summary={{ label: 'Total', value: formatCurrency(totals.total, form.currencySymbol) }}
+      dirty={dirty}
+      onDiscard={draft.clear}
+      lastSavedAt={existing?.updatedAt}
+      autosaves={!existing}
+      banner={
+        draft.draft && (
+          <DraftBanner
+            savedAtLabel={draft.draft.savedAtLabel}
+            detail={draftDetail(draft.draft.form)}
+            onRestore={restoreDraft}
+            onDiscard={draft.discardDraft}
+          />
+        )
       }
       form={
         <>

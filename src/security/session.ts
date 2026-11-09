@@ -12,6 +12,7 @@ import { useCompanyStore, companyFromWorkspace } from '../store/useCompanyStore'
 import { DEFAULT_POLICY, useAccessStore, type SecurityPolicy } from '../store/useAccessStore';
 import { loadAuditLog, logAudit, useAuditStore } from '../store/useAuditStore';
 import { loadStamps, useStampsStore } from '../store/useStampsStore';
+import { clearAllDrafts } from '../components/documents/editor/useDraftAutosave';
 
 const ACTIVE_WS_KEY = 'devcity-active-workspace';
 const LAST_EMAIL_KEY = 'devcity-last-email';
@@ -298,6 +299,7 @@ export const signOut = async (reason: 'manual' | 'idle' | 'hidden' = 'manual') =
     );
     await flushSync();
   }
+  clearAllDrafts(); // unsaved drafts contain client details: don't keep them past the session
   await supabase.auth.signOut({ scope: 'local' });
 };
 

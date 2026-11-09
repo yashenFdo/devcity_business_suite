@@ -44,13 +44,44 @@ interface FieldProps {
   children: React.ReactNode;
 }
 
-export const Field: React.FC<FieldProps> = ({ label, htmlFor, hint, error, required, className = '', children }) => (
-  <div className={className}>
-    <label htmlFor={htmlFor} className="label">
-      {label}
-      {required && <span className="ml-0.5 text-rose-500">*</span>}
-    </label>
-    {children}
-    {error ? <p className="mt-1.5 text-xs font-medium text-rose-600">{error}</p> : hint && <p className="hint">{hint}</p>}
-  </div>
-);
+const FORM_CONTROLS = new Set(['input', 'select', 'textarea']);
+type ControlProps = { id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean };
+
+/**
+ * Label + control + hint/error. When the child is a single native input, select or
+ * textarea, it is linked to the label (and to its hint/error) automatically.
+ */
+export const Field: React.FC<FieldProps> = ({ label, htmlFor, hint, error, required, className = '', children }) => {
+  const autoId = useId();
+  const native =
+    React.isValidElement<ControlProps>(children) && typeof children.type === 'string' && FORM_CONTROLS.has(children.type);
+  const controlId = htmlFor ?? (native ? children.props.id ?? `${autoId}-control` : undefined);
+  const noteId = error || hint ? `${autoId}-note` : undefined;
+  const control = native
+    ? React.cloneElement(children, {
+        id: controlId,
+        'aria-describedby': [children.props['aria-describedby'], noteId].filter(Boolean).join(' ') || undefined,
+        'aria-invalid': error ? true : children.props['aria-invalid'],
+      })
+    : children;
+  return (
+    <div className={className}>
+      <label htmlFor={controlId} className="label">
+        {label}
+        {required && <span className="ml-0.5 text-rose-500">*</span>}
+      </label>
+      {control}
+      {error ? (
+        <p id={noteId} className="mt-1.5 text-xs font-medium text-rose-600">
+          {error}
+        </p>
+      ) : (
+        hint && (
+          <p id={noteId} className="hint">
+            {hint}
+          </p>
+        )
+      )}
+    </div>
+  );
+};

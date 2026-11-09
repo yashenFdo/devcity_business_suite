@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Check, History, Loader2, Printer } from 'lucide-react';
+import { Check, FileText, History } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useBillsStore } from '../../store/useBillsStore';
 import { useCompanyStore } from '../../store/useCompanyStore';
@@ -13,6 +13,9 @@ import { DocumentPreviewRenderer } from '../../components/documents/DocumentPrev
 import { EditorShell } from '../../components/documents/editor/EditorShell';
 import { Field, FormSection } from '../../components/documents/editor/FormSection';
 import { useSaveShortcut, useUnsavedChangesWarning } from '../../components/documents/editor/useEditorGuards';
+import { useDraftAutosave, useDraftKey } from '../../components/documents/editor/useDraftAutosave';
+import { useSaveFeedback } from '../../components/documents/editor/useSaveFeedback';
+import { DraftBanner } from '../../components/documents/editor/DraftBanner';
 import { useDocumentPrint } from '../../components/documents/useDocumentPrint';
 import { PAYMENT_METHOD_OPTIONS } from '../../components/documents/paymentMethods';
 import { DEFAULT_TEMPLATE } from '../../components/documents/templateOptions';
@@ -23,7 +26,7 @@ import type { Bill, Company, CurrencyCode, DiscountType, LineItem, PaymentMethod
 import { SUPPORTED_CURRENCIES } from '../../types';
 import { generateBillNumber, generateId } from '../../utils/documentNumber';
 import { calculateDocumentTotals } from '../../utils/calculations';
-import { addDays, formatDate, today } from '../../utils/formatters';
+import { addDays, formatCurrency, today } from '../../utils/formatters';
 import { BILL_TERMS, billTermsLabel, knownVendors, termDays } from './billDocument';
 
 interface BillForm {
@@ -109,6 +112,16 @@ const newBill = (company: Company, existingNumbers: string[]): BillForm => ({
   signOff: defaultSignOff(company),
 });
 
+/** One-line hint at what an autosaved draft contains, e.g. "AWS · $1,240.00". */
+const draftDetail = (d: BillForm): string | undefined => {
+  try {
+    const { total } = calculateDocumentTotals(d.lineItems, d.discountValue, d.taxPercent, d.discountType);
+    return [d.vendorName.trim(), total > 0 ? formatCurrency(total, d.currencySymbol) : ''].filter(Boolean).join(' · ') || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /** Route wrapper: remounts the editor when switching between documents. */
 export const BillCreate: React.FC<{ editMode?: boolean }> = ({ editMode = false }) => {
   const { id } = useParams<{ id: string }>();
@@ -129,12 +142,23 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   );
   const [form, setForm] = useState<BillForm>(initial);
   const [submitted, setSubmitted] = useState(false);
-  const [saving, setSaving] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const set = <K extends keyof BillForm>(key: K, value: BillForm[K]) => setForm((f) => ({ ...f, [key]: value }));
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
-  useUnsavedChangesWarning(dirty && !saving);
+  const feedback = useSaveFeedback();
+  const draft = useDraftAutosave(useDraftKey('bill', !editId), form, initial);
+  useUnsavedChangesWarning(dirty && !feedback.busy);
+
+  const restoreDraft = () => {
+    const d = draft.takeDraft();
+    if (!d) return;
+    // Someone may have used the draft's number since — keep the fresh one then.
+    const draftNumber = d.billNumber.trim().toLowerCase();
+    const taken = bills.some((b) => b.billNumber.toLowerCase() === draftNumber);
+    setForm(taken ? { ...d, billNumber: initial.billNumber } : d);
+    toast.success(taken ? `Draft restored · renumbered to ${initial.billNumber}` : 'Draft restored');
+  };
 
   const vendors = useMemo(() => knownVendors(bills), [bills]);
   const matchedVendor = existing
@@ -204,12 +228,12 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   const handlePrint = useDocumentPrint(printRef, form.billNumber || 'Bill');
 
   const save = (record = false) => {
+    if (feedback.busy) return;
     setSubmitted(true);
     if (hasErrors) {
       toast.error('Please fix the highlighted fields.');
       return;
     }
-    setSaving(true);
     const status: Bill['status'] = record && derivedStatus === 'draft' ? 'unpaid' : derivedStatus;
     const payload = {
       billNumber: number,
@@ -245,14 +269,15 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       if (existing) {
         updateBill(existing.id, payload);
         toast.success(`${payload.billNumber} saved`);
-        navigate(`/bills/${existing.id}`);
+        feedback.succeed('save', () => navigate(`/bills/${existing.id}`));
       } else {
         const created = addBill(payload);
+        draft.clear();
         toast.success(record ? `${created.billNumber} recorded` : `${created.billNumber} saved as draft`);
-        navigate(`/bills/${created.id}`);
+        feedback.succeed(record ? 'record' : 'draft', () => navigate(`/bills/${created.id}`));
       }
     } catch {
-      setSaving(false);
+      // The store already explained the failure (e.g. missing permission).
     }
   };
 
@@ -298,31 +323,29 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       currency={form.currency}
       onCurrencyChange={(c) => setForm((f) => ({ ...f, currency: c, currencySymbol: SUPPORTED_CURRENCIES[c].symbol }))}
       actions={
-        <>
-          <button type="button" className="btn-ghost btn-sm hidden md:inline-flex" onClick={() => handlePrint()}>
-            <Printer size={15} /> Preview PDF
-          </button>
-          {existing ? (
-            <button type="button" className="btn-primary btn-sm" onClick={() => save(false)} disabled={saving}>
-              {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Save changes
-            </button>
-          ) : (
-            <>
-              <button type="button" className="btn-secondary btn-sm" onClick={() => save(false)} disabled={saving}>
-                Save draft
-              </button>
-              <button type="button" className="btn-primary btn-sm" onClick={() => save(true)} disabled={saving}>
-                {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Record bill
-              </button>
-            </>
-          )}
-        </>
+        existing
+          ? [{ id: 'save', label: 'Save changes', icon: Check, onClick: () => save(false), primary: true }]
+          : [
+              { id: 'draft', label: 'Save draft', icon: FileText, onClick: () => save(false) },
+              { id: 'record', label: 'Record bill', shortLabel: 'Record', icon: Check, onClick: () => save(true), primary: true },
+            ]
       }
-      footer={
-        <p className="px-1 text-center text-xs text-slate-400">
-          {dirty ? 'Unsaved changes' : existing ? `Last saved ${formatDate(existing.updatedAt, 'dd MMM yyyy, HH:mm')}` : 'Not saved yet'} ·
-          Press <span className="kbd">Ctrl</span> <span className="kbd">S</span> to save
-        </p>
+      saved={feedback.saved}
+      onPrint={() => handlePrint()}
+      summary={{ label: 'Total', value: formatCurrency(totals.total, form.currencySymbol) }}
+      dirty={dirty}
+      onDiscard={draft.clear}
+      lastSavedAt={existing?.updatedAt}
+      autosaves={!existing}
+      banner={
+        draft.draft && (
+          <DraftBanner
+            savedAtLabel={draft.draft.savedAtLabel}
+            detail={draftDetail(draft.draft.form)}
+            onRestore={restoreDraft}
+            onDiscard={draft.discardDraft}
+          />
+        )
       }
       form={
         <>
