@@ -1,4 +1,5 @@
 import type { Company, Signatory, SignOffOptions, Stamp } from '../../types';
+import type { DocumentData } from './documentTypes';
 
 export const MAX_SIGNATORIES = 5;
 
@@ -39,5 +40,28 @@ export const resolveSignOff = (
     stamps: (options.stampIds ?? []).map((id) => stamps.find((s) => s.id === id)).filter((s): s is Stamp => !!s),
     showPaidStamp: options.paidStamp ?? isPaid,
     stampDate: options.stampDate || documentDate,
+  };
+};
+
+/** Exactly the four stored sign-off fields (all keys present, so clearing one also clears it on save). */
+export const pickSignOff = (o: SignOffOptions): SignOffOptions => ({
+  signatoryIds: o.signatoryIds,
+  stampIds: o.stampIds,
+  paidStamp: o.paidStamp,
+  stampDate: o.stampDate || undefined,
+});
+
+/**
+ * Template-side fallbacks so documents saved before sign-off options existed
+ * still look right: the first company signatory and the automatic PAID stamp.
+ * Receipts are treated as paid; quotations never get a PAID stamp automatically.
+ */
+export const withSignOffFallbacks = (data: DocumentData): DocumentData => {
+  const isPaid = data.status === 'paid' || data.documentType === 'receipt';
+  return {
+    ...data,
+    signatories: data.signatories ?? companySignatories(data.company).slice(0, 1),
+    stampDate: data.stampDate || data.date,
+    showPaidStamp: data.showPaidStamp ?? (isPaid && data.documentType !== 'quotation'),
   };
 };

@@ -1,6 +1,8 @@
 import React from 'react';
 import type { DocumentData } from '../documentTypes';
 import { formatCurrency, formatDate, getStatusLabel } from '../../../utils/formatters';
+import { SignOffBlock } from '../SignOffBlock';
+import { withSignOffFallbacks } from '../signOff';
 
 
 export const ModernMinimalTemplate: React.FC<{ data: DocumentData }> = ({ data }) => {
@@ -9,6 +11,7 @@ export const ModernMinimalTemplate: React.FC<{ data: DocumentData }> = ({ data }
   const isQuotation = data.documentType === 'quotation';
   const isReceipt = data.documentType === 'receipt';
   const isBill = data.documentType === 'bill';
+  const signOff = withSignOffFallbacks(data);
 
   const docTitle =
     data.documentType === 'quotation' ? 'QUOTATION' :
@@ -249,24 +252,15 @@ export const ModernMinimalTemplate: React.FC<{ data: DocumentData }> = ({ data }
             </div>
           )}
         </div>
+
+        {/* Sign-off: signatories and stamps */}
+        <SignOffBlock data={signOff} heading={`For ${company.name}`} />
       </div>
 
-      {/* Footer Sign-off */}
-      <div className="pt-8 border-t border-slate-200 mt-8 flex justify-between items-end text-xs text-slate-400">
-        <div>
-          <p>{company.footer || 'Thank you for your business!'}</p>
-          <p className="text-[10px] text-slate-300 mt-0.5">{data.number}</p>
-        </div>
-        <div className="text-right">
-          {company.signature ? (
-            <img src={company.signature} alt="Signature" className="h-10 max-w-[140px] object-contain mb-1 ml-auto" />
-          ) : (
-            <div className="h-8"></div>
-          )}
-          <p className="font-medium text-slate-700 text-xs border-t border-slate-200 pt-1 w-44 ml-auto text-center">
-            {company.name} Authorized
-          </p>
-        </div>
+      {/* Footer */}
+      <div className="pt-6 border-t border-slate-200 mt-8 flex justify-between items-end text-xs text-slate-400">
+        <p>{company.footer || 'Thank you for your business!'}</p>
+        <p className="text-[10px] text-slate-300">{data.number}</p>
       </div>
     </div>
   );

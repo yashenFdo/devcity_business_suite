@@ -5,6 +5,9 @@ import toast from 'react-hot-toast';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
 import { useCompanyStore } from '../../store/useCompanyStore';
 import { useCustomersStore } from '../../store/useCustomersStore';
+import { SignOffSection } from '../../components/documents/editor/SignOffSection';
+import { defaultSignOff, pickSignOff, resolveSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 import { LineItemsTable } from '../../components/documents/LineItemsTable';
 import { TotalsSection } from '../../components/documents/TotalsSection';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
@@ -19,7 +22,7 @@ import { DEFAULT_TEMPLATE } from '../../components/documents/templateOptions';
 import type { DocumentData } from '../../components/documents/documentTypes';
 import { StatusBadge } from '../../components/ui/Badge';
 import { NotFoundState } from '../../components/ui/States';
-import type { Company, Customer, CurrencyCode, DiscountType, Invoice, LineItem, PaymentMethod, TemplateId } from '../../types';
+import type { Company, Customer, CurrencyCode, DiscountType, Invoice, LineItem, PaymentMethod, SignOffOptions, TemplateId } from '../../types';
 import { SUPPORTED_CURRENCIES } from '../../types';
 import { generateId, generateInvoiceNumber } from '../../utils/documentNumber';
 import { calculateDocumentTotals } from '../../utils/calculations';
@@ -45,6 +48,7 @@ interface InvoiceForm {
   paymentInstructions: string;
   notes: string;
   terms: string;
+  signOff: SignOffOptions;
 }
 
 const blankItem = (): LineItem => ({
@@ -78,6 +82,7 @@ const fromInvoice = (inv: Invoice): InvoiceForm => ({
   paymentInstructions: inv.paymentInstructions || '',
   notes: inv.notes || '',
   terms: inv.terms || '',
+  signOff: pickSignOff(inv),
 });
 
 const newInvoice = (company: Company, existingNumbers: string[]): InvoiceForm => ({
@@ -102,6 +107,7 @@ const newInvoice = (company: Company, existingNumbers: string[]): InvoiceForm =>
     : '',
   notes: `Thank you for partnering with ${company.name}.`,
   terms: 'Payment is due by the date shown above. Late payments may incur a 1.5% monthly service charge.',
+  signOff: defaultSignOff(company),
 });
 
 /** Route wrapper: remounts the editor when switching between documents. */
@@ -117,6 +123,7 @@ const InvoiceEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   const updateInvoice = useInvoicesStore((s) => s.updateInvoice);
   const company = useCompanyStore((s) => s.company);
   const customers = useCustomersStore((s) => s.customers);
+  const stamps = useStampsStore((s) => s.stamps);
   const location = useLocation();
   const existing = editId ? invoices.find((i) => i.id === editId) : undefined;
 
@@ -186,6 +193,7 @@ const InvoiceEditor: React.FC<{ editId?: string }> = ({ editId }) => {
     terms: form.terms,
     company, // saving re-snapshots the current company profile, so preview it as-is
     templateId: form.templateId,
+    ...resolveSignOff(form.signOff, company, stamps, derivedStatus === 'paid', form.date),
   };
 
   const handlePrint = useDocumentPrint(printRef, form.invoiceNumber || 'Invoice');
@@ -225,6 +233,7 @@ const InvoiceEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       notes: form.notes,
       terms: form.terms,
       companySnapshot: company,
+      ...pickSignOff(form.signOff),
     };
     try {
       if (existing) {
@@ -439,6 +448,15 @@ const InvoiceEditor: React.FC<{ editId?: string }> = ({ editId }) => {
               </div>
             )}
           </FormSection>
+
+          <SignOffSection
+            step={6}
+            value={form.signOff}
+            onChange={(v) => set('signOff', v)}
+            documentType="invoice"
+            documentDate={form.date}
+            isPaid={derivedStatus === 'paid'}
+          />
         </>
       }
       preview={<DocumentPreviewRenderer ref={printRef} data={preview} templateId={form.templateId} />}

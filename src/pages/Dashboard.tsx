@@ -24,6 +24,8 @@ import { useCompanyStore } from '../store/useCompanyStore';
 import { useAccessStore } from '../store/useAccessStore';
 import { useSession, useCan } from '../security/sessionState';
 import { StatusBadge } from '../components/ui/Badge';
+import { AvailableBalanceCard } from './dashboard/AvailableBalanceCard';
+import { cashPosition } from '../utils/cash';
 import { Avatar } from '../components/ui/Avatar';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { buildAlerts, joinRequestAlerts, effectiveBillStatus, effectiveInvoiceStatus, effectiveQuotationStatus, type AlertTone } from '../utils/insights';
@@ -150,6 +152,9 @@ export const Dashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, receipts, quotations, bills, home]);
 
+  const cash = useMemo(() => cashPosition(company, receipts, bills), [company, receipts, bills]);
+  const projected = Math.round((cash.available + stats.net) * 100) / 100;
+
   const monthly = useMemo(() => {
     const months = Array.from({ length: 6 }, (_, k) => startOfMonth(subMonths(new Date(), 5 - k)));
     return months.map((m) => {
@@ -222,6 +227,8 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
+      <AvailableBalanceCard />
+
       {/* KPIs: what's owed to you, what you owe, and the difference */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Kpi
@@ -255,15 +262,15 @@ export const Dashboard: React.FC = () => {
           to="/bills"
         />
         <Kpi
-          label="Net position"
-          value={`${stats.net < 0 ? '−' : ''}${formatCurrency(Math.abs(stats.net), sym)}`}
+          label="Projected balance"
+          value={`${projected < 0 ? '−' : ''}${formatCurrency(Math.abs(projected), sym)}`}
           sub={
-            <span className={stats.net >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-rose-600'}>
-              {stats.net >= 0 ? 'Receivables cover open bills' : 'Open bills exceed receivables'}
+            <span className={projected >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-rose-600'}>
+              After collecting open invoices &amp; paying open bills
             </span>
           }
           icon={AlertCircle}
-          tone={stats.net >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}
+          tone={projected >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}
           to="/"
         />
         <Kpi

@@ -1,6 +1,8 @@
 import React from 'react';
 import type { DocumentData } from '../documentTypes';
 import { formatCurrency, formatDate, getStatusLabel } from '../../../utils/formatters';
+import { SignOffBlock } from '../SignOffBlock';
+import { withSignOffFallbacks } from '../signOff';
 
 export const TechModernTemplate: React.FC<{ data: DocumentData }> = ({ data }) => {
   const { company, customer, currencySymbol } = data;
@@ -8,6 +10,7 @@ export const TechModernTemplate: React.FC<{ data: DocumentData }> = ({ data }) =
   const isQuotation = data.documentType === 'quotation';
   const isReceipt = data.documentType === 'receipt';
   const isBill = data.documentType === 'bill';
+  const signOff = withSignOffFallbacks(data);
 
   const docTypeBadge =
     data.documentType === 'quotation' ? 'ENGINEERING QUOTATION' :
@@ -248,24 +251,15 @@ export const TechModernTemplate: React.FC<{ data: DocumentData }> = ({ data }) =
           {data.terms && <p><span className="font-mono text-slate-700 font-semibold">TERMS: </span>{data.terms}</p>}
           {data.notes && <p><span className="font-mono text-slate-700 font-semibold">NOTES: </span>{data.notes}</p>}
         </div>
+
+        {/* Sign-off: signatories and stamps */}
+        <SignOffBlock data={signOff} heading={`// Authorised sign-off · ${company.name}`} />
       </div>
 
-      {/* Footer with Digital Verification Seal */}
-      <div className="pt-6 border-t border-slate-200 mt-8 flex justify-between items-end text-xs text-slate-400">
-        <div>
-          <p className="font-medium text-slate-700">{company.footer || company.name}</p>
-          <p className="font-mono text-[10px] text-slate-400 mt-0.5">{data.number} · {(company.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '').toUpperCase()}</p>
-        </div>
-        <div className="text-right">
-          {company.signature ? (
-            <img src={company.signature} alt="Authorised signature" className="h-10 max-w-[140px] object-contain mb-1 ml-auto" />
-          ) : (
-            <div className="h-8"></div>
-          )}
-          <p className="font-mono text-[10px] text-slate-700 border-t border-slate-200 pt-1 w-44 ml-auto text-center font-bold">
-            {company.name.toUpperCase()} AUTHORISED SIGN-OFF
-          </p>
-        </div>
+      {/* Footer */}
+      <div className="pt-6 border-t border-slate-200 mt-8 text-xs text-slate-400">
+        <p className="font-medium text-slate-700">{company.footer || company.name}</p>
+        <p className="font-mono text-[10px] text-slate-400 mt-0.5">{data.number} · {(company.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '').toUpperCase()}</p>
       </div>
     </div>
   );

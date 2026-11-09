@@ -4,6 +4,9 @@ import { Check, History, Loader2, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useBillsStore } from '../../store/useBillsStore';
 import { useCompanyStore } from '../../store/useCompanyStore';
+import { SignOffSection } from '../../components/documents/editor/SignOffSection';
+import { defaultSignOff, pickSignOff, resolveSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 import { LineItemsTable } from '../../components/documents/LineItemsTable';
 import { TotalsSection } from '../../components/documents/TotalsSection';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
@@ -16,7 +19,7 @@ import { DEFAULT_TEMPLATE } from '../../components/documents/templateOptions';
 import type { DocumentData } from '../../components/documents/documentTypes';
 import { StatusBadge } from '../../components/ui/Badge';
 import { NotFoundState } from '../../components/ui/States';
-import type { Bill, Company, CurrencyCode, DiscountType, LineItem, PaymentMethod, TemplateId } from '../../types';
+import type { Bill, Company, CurrencyCode, DiscountType, LineItem, PaymentMethod, SignOffOptions, TemplateId } from '../../types';
 import { SUPPORTED_CURRENCIES } from '../../types';
 import { generateBillNumber, generateId } from '../../utils/documentNumber';
 import { calculateDocumentTotals } from '../../utils/calculations';
@@ -44,6 +47,7 @@ interface BillForm {
   paymentDate: string;
   paymentDetails: string;
   notes: string;
+  signOff: SignOffOptions;
 }
 
 const blankItem = (): LineItem => ({
@@ -78,6 +82,7 @@ const fromBill = (b: Bill): BillForm => ({
   paymentDate: b.paymentDate || '',
   paymentDetails: b.paymentDetails || '',
   notes: b.notes || '',
+  signOff: pickSignOff(b),
 });
 
 const newBill = (company: Company, existingNumbers: string[]): BillForm => ({
@@ -101,6 +106,7 @@ const newBill = (company: Company, existingNumbers: string[]): BillForm => ({
   paymentDate: '',
   paymentDetails: '',
   notes: '',
+  signOff: defaultSignOff(company),
 });
 
 /** Route wrapper: remounts the editor when switching between documents. */
@@ -115,6 +121,7 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   const addBill = useBillsStore((s) => s.addBill);
   const updateBill = useBillsStore((s) => s.updateBill);
   const company = useCompanyStore((s) => s.company);
+  const stamps = useStampsStore((s) => s.stamps);
   const existing = editId ? bills.find((b) => b.id === editId) : undefined;
 
   const [initial] = useState<BillForm>(() =>
@@ -191,6 +198,7 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
     notes: form.notes,
     company, // saving re-snapshots the current company profile, so preview it as-is
     templateId: form.templateId,
+    ...resolveSignOff(form.signOff, company, stamps, derivedStatus === 'paid', form.date),
   };
 
   const handlePrint = useDocumentPrint(printRef, form.billNumber || 'Bill');
@@ -231,6 +239,7 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       templateId: form.templateId,
       notes: form.notes,
       companySnapshot: company,
+      ...pickSignOff(form.signOff),
     };
     try {
       if (existing) {
@@ -553,6 +562,15 @@ const BillEditor: React.FC<{ editId?: string }> = ({ editId }) => {
               </div>
             )}
           </FormSection>
+
+          <SignOffSection
+            step={6}
+            value={form.signOff}
+            onChange={(v) => set('signOff', v)}
+            documentType="bill"
+            documentDate={form.date}
+            isPaid={derivedStatus === 'paid'}
+          />
         </>
       }
       preview={<DocumentPreviewRenderer ref={printRef} data={preview} templateId={form.templateId} />}

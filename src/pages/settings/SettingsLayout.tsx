@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Building2, History, Palette, ShieldCheck, Users } from 'lucide-react';
+import { Building2, History, Palette, ShieldCheck, Stamp, Users } from 'lucide-react';
 import { useSession } from '../../security/sessionState';
 import { roleCan, type Permission } from '../../security/permissions';
 import { useAccessStore } from '../../store/useAccessStore';
@@ -8,6 +8,7 @@ import { useAccessStore } from '../../store/useAccessStore';
 const ITEMS: { to: string; label: string; icon: React.ElementType; end?: boolean; permission?: Permission; hint: string }[] = [
   { to: '/settings', end: true, label: 'Company profile', icon: Building2, permission: 'settings.manage', hint: 'Legal details, address & bank' },
   { to: '/settings/branding', label: 'Branding & documents', icon: Palette, permission: 'settings.manage', hint: 'Logo, colours, templates' },
+  { to: '/settings/signatures', label: 'Signatures & stamps', icon: Stamp, hint: 'Signatories, company & personal stamps' },
   { to: '/settings/team', label: 'Team & access', icon: Users, permission: 'users.manage', hint: 'Invites, codes & roles' },
   { to: '/settings/security', label: 'Account & security', icon: ShieldCheck, hint: 'Profile, password, sessions' },
   { to: '/settings/activity', label: 'Activity log', icon: History, permission: 'audit.view', hint: 'Who did what, and when' },

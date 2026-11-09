@@ -1,5 +1,7 @@
-import type { Company, Receipt } from '../../types';
+import type { Company, Receipt, SignOffOptions, Stamp } from '../../types';
 import type { DocumentData } from '../../components/documents/documentTypes';
+import { resolveSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 
 /** The receipt fields a template needs — a saved receipt or the editor's live form. */
 export type ReceiptDocumentSource = Pick<
@@ -16,14 +18,19 @@ export type ReceiptDocumentSource = Pick<
   | 'currencySymbol'
   | 'templateId'
   | 'notes'
-> & { companySnapshot?: Company };
+> &
+  SignOffOptions & { companySnapshot?: Company };
 
 /**
  * Map a receipt to template data. Company details come from the snapshot
  * taken when the receipt was saved; branding (logo, signature, colour)
  * always follows the current company settings.
  */
-export const toReceiptDocument = (r: ReceiptDocumentSource, company: Company): DocumentData => {
+export const toReceiptDocument = (
+  r: ReceiptDocumentSource,
+  company: Company,
+  stamps: Stamp[] = useStampsStore.getState().stamps
+): DocumentData => {
   const snapshot = r.companySnapshot ?? company;
   return {
     documentType: 'receipt',
@@ -48,5 +55,6 @@ export const toReceiptDocument = (r: ReceiptDocumentSource, company: Company): D
       brandColor: company.brandColor,
     },
     templateId: r.templateId,
+    ...resolveSignOff(r, company, stamps, true, r.date),
   };
 };

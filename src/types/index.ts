@@ -104,6 +104,9 @@ export interface Company {
   currencySymbol: string;
   /** Accent colour used on generated documents (hex). */
   brandColor?: string;
+  /** Cash in the bank on `openingBalanceDate` (start point for the Available balance). */
+  openingBalance?: number;
+  openingBalanceDate?: string;
   /** Template pre-selected for new documents. */
   defaultTemplate?: TemplateId;
   footer?: string;

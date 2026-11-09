@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Ban, CheckCircle2, Copy, Download, Mail, MapPin, Pencil, Phone, ThumbsUp, Trash2 } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle2, Copy, Download, Mail, MapPin, Pencil, Phone, Share2, ThumbsUp, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useBillsStore } from '../../store/useBillsStore';
 import { useCompanyStore } from '../../store/useCompanyStore';
@@ -15,6 +15,7 @@ import { DetailRow, SideCard } from '../../components/ui/SideCard';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
 import { DEFAULT_TEMPLATE, TEMPLATE_OPTIONS } from '../../components/documents/templateOptions';
 import { useDocumentPrint } from '../../components/documents/useDocumentPrint';
+import { ShareDocumentModal } from '../../components/documents/ShareDocumentModal';
 import { paymentMethodLabel } from '../../components/documents/paymentMethods';
 import type { Bill, TemplateId } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -38,6 +39,7 @@ export const BillView: React.FC = () => {
   const canPay = useCan('payments.record');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [paying, setPaying] = useState<Bill | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,9 @@ export const BillView: React.FC = () => {
           )}
           <button type="button" className="btn-secondary" onClick={() => handlePrint()}>
             <Download size={15} /> Download PDF
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => setShareOpen(true)}>
+            <Share2 size={15} /> Share
           </button>
           {canEdit && (
             <Link to={`/bills/${bill.id}/edit`} className="btn-secondary">
@@ -277,6 +282,15 @@ export const BillView: React.FC = () => {
       </div>
 
       <BillPaymentModal bill={paying} onClose={() => setPaying(null)} />
+      <ShareDocumentModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        collection="bills"
+        recordId={bill.id}
+        data={docData}
+        templateId={bill.templateId || DEFAULT_TEMPLATE}
+        contact={{ name: bill.vendorName, email: bill.vendorEmail, phone: bill.vendorPhone }}
+      />
       <ConfirmModal
         isOpen={cancelOpen}
         onClose={() => setCancelOpen(false)}

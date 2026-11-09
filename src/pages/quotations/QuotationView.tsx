@@ -12,6 +12,7 @@ import {
   Pencil,
   Phone,
   Send,
+  Share2,
   Trash2,
   XCircle,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ import { Field } from '../../components/documents/editor/FormSection';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
 import { TEMPLATE_OPTIONS, templateName } from '../../components/documents/templateOptions';
 import { useDocumentPrint } from '../../components/documents/useDocumentPrint';
+import { ShareDocumentModal } from '../../components/documents/ShareDocumentModal';
 import type { Quotation, TemplateId } from '../../types';
 import { addDays, formatCurrency, formatDate, today } from '../../utils/formatters';
 import { effectiveQuotationStatus, effectiveInvoiceStatus } from '../../utils/insights';
@@ -54,6 +56,7 @@ export const QuotationView: React.FC = () => {
   const canDelete = useCan('documents.delete');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
@@ -131,6 +134,9 @@ export const QuotationView: React.FC = () => {
           )}
           <button type="button" className="btn-secondary" onClick={() => handlePrint()}>
             <Download size={15} /> Download PDF
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => setShareOpen(true)}>
+            <Share2 size={15} /> Share
           </button>
           {canEdit && (
             <Link to={`/quotations/${quotation.id}/edit`} className="btn-secondary">
@@ -326,6 +332,15 @@ export const QuotationView: React.FC = () => {
           }
         />
       )}
+      <ShareDocumentModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        collection="quotations"
+        recordId={quotation.id}
+        data={docData}
+        templateId={quotation.templateId}
+        contact={{ name: quotation.customer.name || quotation.customer.company, email: quotation.customer.email, phone: quotation.customer.phone }}
+      />
       <ConfirmModal
         isOpen={convertOpen}
         onClose={() => setConvertOpen(false)}

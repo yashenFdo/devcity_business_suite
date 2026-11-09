@@ -1,5 +1,7 @@
-import type { Company, Invoice } from '../../types';
+import type { Company, Invoice, Stamp } from '../../types';
 import type { DocumentData } from '../../components/documents/documentTypes';
+import { resolveSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 import { effectiveInvoiceStatus } from '../../utils/insights';
 
 /**
@@ -7,7 +9,11 @@ import { effectiveInvoiceStatus } from '../../utils/insights';
  * snapshot taken when the invoice was saved; branding (logo, signature,
  * colour) always follows the current company settings.
  */
-export const toInvoiceDocument = (inv: Invoice, company: Company): DocumentData => {
+export const toInvoiceDocument = (
+  inv: Invoice,
+  company: Company,
+  stamps: Stamp[] = useStampsStore.getState().stamps
+): DocumentData => {
   const snapshot = inv.companySnapshot ?? company;
   return {
     documentType: 'invoice',
@@ -41,5 +47,6 @@ export const toInvoiceDocument = (inv: Invoice, company: Company): DocumentData 
       brandColor: company.brandColor,
     },
     templateId: inv.templateId,
+    ...resolveSignOff(inv, company, stamps, effectiveInvoiceStatus(inv) === 'paid', inv.date),
   };
 };

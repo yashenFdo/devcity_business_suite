@@ -27,6 +27,7 @@ const CustomersList = lazy(() => import('./pages/customers/CustomersList').then(
 const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
 const CompanySettings = lazy(() => import('./pages/settings/CompanySettings').then((m) => ({ default: m.CompanySettings })));
 const BrandingSettings = lazy(() => import('./pages/settings/BrandingSettings').then((m) => ({ default: m.BrandingSettings })));
+const SignaturesSettings = lazy(() => import('./pages/settings/SignaturesSettings').then((m) => ({ default: m.SignaturesSettings })));
 const TeamSettings = lazy(() => import('./pages/settings/TeamSettings').then((m) => ({ default: m.TeamSettings })));
 const SecuritySettings = lazy(() => import('./pages/settings/SecuritySettings').then((m) => ({ default: m.SecuritySettings })));
 const PeopleDirectory = lazy(() => import('./pages/people/PeopleDirectory').then((m) => ({ default: m.PeopleDirectory })));
@@ -109,6 +110,7 @@ function App() {
                     </RequirePermission>
                   }
                 />
+                <Route path="signatures" element={<SignaturesSettings />} />
                 <Route
                   path="team"
                   element={

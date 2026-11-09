@@ -5,6 +5,9 @@ import toast from 'react-hot-toast';
 import { useReceiptsStore } from '../../store/useReceiptsStore';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
 import { useCompanyStore } from '../../store/useCompanyStore';
+import { SignOffSection } from '../../components/documents/editor/SignOffSection';
+import { defaultSignOff, pickSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
 import { EditorShell } from '../../components/documents/editor/EditorShell';
 import { Field, FormSection } from '../../components/documents/editor/FormSection';
@@ -17,7 +20,7 @@ import { DEFAULT_TEMPLATE } from '../../components/documents/templateOptions';
 import { StatusBadge } from '../../components/ui/Badge';
 import { Avatar } from '../../components/ui/Avatar';
 import { NotFoundState } from '../../components/ui/States';
-import type { Company, CurrencyCode, Customer, Invoice, PaymentMethod, Receipt, TemplateId } from '../../types';
+import type { Company, CurrencyCode, Customer, Invoice, PaymentMethod, Receipt, SignOffOptions, TemplateId } from '../../types';
 import { SUPPORTED_CURRENCIES } from '../../types';
 import { generateReceiptNumber } from '../../utils/documentNumber';
 import { formatCurrency, formatDate, today } from '../../utils/formatters';
@@ -41,6 +44,7 @@ interface ReceiptForm {
   referenceNumber: string;
   customer: Customer;
   notes: string;
+  signOff: SignOffOptions;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -89,6 +93,7 @@ const fromReceipt = (r: Receipt): ReceiptForm => ({
   referenceNumber: r.referenceNumber || '',
   customer: r.customer,
   notes: r.notes || '',
+  signOff: pickSignOff(r),
 });
 
 const newReceipt = (company: Company, existingNumbers: string[]): ReceiptForm => ({
@@ -105,6 +110,7 @@ const newReceipt = (company: Company, existingNumbers: string[]): ReceiptForm =>
   referenceNumber: '',
   customer: emptyCustomer(),
   notes: defaultNote('standalone', '', company),
+  signOff: defaultSignOff(company),
 });
 
 /** Route wrapper: remounts the editor when switching between documents. */
@@ -122,6 +128,7 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   const invoices = useInvoicesStore((s) => s.invoices);
   const markAsPaid = useInvoicesStore((s) => s.markAsPaid);
   const company = useCompanyStore((s) => s.company);
+  const stamps = useStampsStore((s) => s.stamps);
   const existing = editId ? receipts.find((r) => r.id === editId) : undefined;
 
   const openInvoices = useMemo(
@@ -199,8 +206,10 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       currencySymbol: sym,
       templateId: form.templateId,
       notes: form.notes,
+      ...form.signOff,
     },
-    company // saving re-snapshots the current company profile, so preview it as-is
+    company, // saving re-snapshots the current company profile, so preview it as-is
+    stamps
   );
 
   const handlePrint = useDocumentPrint(printRef, form.receiptNumber || 'Receipt');
@@ -228,6 +237,7 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       templateId: form.templateId,
       notes: form.notes,
       companySnapshot: company,
+      ...pickSignOff(form.signOff),
     };
     try {
       if (existing) {
@@ -545,6 +555,16 @@ const ReceiptEditor: React.FC<{ editId?: string }> = ({ editId }) => {
               <textarea id="receipt-notes" rows={3} className="textarea" value={form.notes} onChange={(e) => set('notes', e.target.value)} />
             </Field>
           </FormSection>
+
+          {/* Step 5 — sign-off */}
+          <SignOffSection
+            step={5}
+            value={form.signOff}
+            onChange={(v) => set('signOff', v)}
+            documentType="receipt"
+            documentDate={form.date}
+            isPaid
+          />
         </>
       }
       preview={<DocumentPreviewRenderer ref={printRef} data={preview} templateId={form.templateId} />}

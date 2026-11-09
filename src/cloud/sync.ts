@@ -71,9 +71,11 @@ const isNumberClash = (err: { code?: string; message?: string } | null) =>
 const slim = (data: object): object => {
   const d = data as { companySnapshot?: Record<string, unknown> };
   if (!d.companySnapshot) return data;
-  const { logo: _logo, signature: _signature, ...snapshot } = d.companySnapshot;
+  // Signatories (with their signature images) are always read from current settings too.
+  const { logo: _logo, signature: _signature, signatories: _signatories, ...snapshot } = d.companySnapshot;
   void _logo;
   void _signature;
+  void _signatories;
   return { ...data, companySnapshot: snapshot };
 };
 

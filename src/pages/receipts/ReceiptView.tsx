@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Copy, Download, FileText, Mail, Pencil, Phone, Trash2, Wallet } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, Download, FileText, Mail, Pencil, Phone, Share2, Trash2, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useReceiptsStore } from '../../store/useReceiptsStore';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
@@ -17,6 +17,7 @@ import { DocumentPreviewRenderer } from '../../components/documents/DocumentPrev
 import { RecordPaymentModal } from '../../components/documents/RecordPaymentModal';
 import { DEFAULT_TEMPLATE, TEMPLATE_OPTIONS } from '../../components/documents/templateOptions';
 import { useDocumentPrint } from '../../components/documents/useDocumentPrint';
+import { ShareDocumentModal } from '../../components/documents/ShareDocumentModal';
 import { paymentMethodLabel } from '../../components/documents/paymentMethods';
 import { toReceiptDocument } from './receiptDocument';
 import type { Invoice, TemplateId } from '../../types';
@@ -38,6 +39,7 @@ export const ReceiptView: React.FC = () => {
   const canPay = useCan('payments.record');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [paying, setPaying] = useState<Invoice | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useDocumentPrint(printRef, receipt?.receiptNumber ?? 'Receipt');
@@ -90,6 +92,9 @@ export const ReceiptView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className="btn-secondary" onClick={() => handlePrint()}>
             <Download size={15} /> Download PDF
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => setShareOpen(true)}>
+            <Share2 size={15} /> Share
           </button>
           {canEdit && (
             <Link to={`/receipts/${receipt.id}/edit`} className="btn-secondary">
@@ -274,6 +279,15 @@ export const ReceiptView: React.FC = () => {
       </div>
 
       <RecordPaymentModal invoice={paying} onClose={() => setPaying(null)} />
+      <ShareDocumentModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        collection="receipts"
+        recordId={receipt.id}
+        data={docData}
+        templateId={receipt.templateId}
+        contact={{ name: receipt.customer.name || receipt.customer.company, email: receipt.customer.email, phone: receipt.customer.phone }}
+      />
       <ConfirmModal
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}

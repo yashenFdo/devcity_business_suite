@@ -1,6 +1,8 @@
 import { differenceInCalendarDays, isValid, parseISO } from 'date-fns';
-import type { Bill, Company } from '../../types';
+import type { Bill, Company, Stamp } from '../../types';
 import type { DocumentData } from '../../components/documents/documentTypes';
+import { resolveSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 import { effectiveBillStatus } from '../../utils/insights';
 
 /** Standard terms offered in the bill editor (all of them map to a fixed number of days). */
@@ -32,7 +34,11 @@ export const billTermsLabel = (date: string, dueDate: string): string | undefine
  * taken when the bill was saved; branding (logo, signature, colour) always
  * follows the current company settings.
  */
-export const toBillDocument = (bill: Bill, company: Company): DocumentData => {
+export const toBillDocument = (
+  bill: Bill,
+  company: Company,
+  stamps: Stamp[] = useStampsStore.getState().stamps
+): DocumentData => {
   const snapshot = bill.companySnapshot ?? company;
   return {
     documentType: 'bill',
@@ -67,6 +73,7 @@ export const toBillDocument = (bill: Bill, company: Company): DocumentData => {
       brandColor: company.brandColor,
     },
     templateId: bill.templateId,
+    ...resolveSignOff(bill, company, stamps, effectiveBillStatus(bill) === 'paid', bill.date),
   };
 };
 

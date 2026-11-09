@@ -1,6 +1,8 @@
 import React from 'react';
 import type { DocumentData } from '../documentTypes';
 import { formatCurrency, formatDate, getStatusLabel } from '../../../utils/formatters';
+import { SignOffBlock } from '../SignOffBlock';
+import { withSignOffFallbacks } from '../signOff';
 
 export const ElegantBusinessTemplate: React.FC<{ data: DocumentData }> = ({ data }) => {
   const { company, customer, currencySymbol } = data;
@@ -8,6 +10,7 @@ export const ElegantBusinessTemplate: React.FC<{ data: DocumentData }> = ({ data
   const isQuotation = data.documentType === 'quotation';
   const isReceipt = data.documentType === 'receipt';
   const isBill = data.documentType === 'bill';
+  const signOff = withSignOffFallbacks(data);
 
   const docTitle =
     data.documentType === 'quotation' ? 'Project Quotation' :
@@ -222,24 +225,17 @@ export const ElegantBusinessTemplate: React.FC<{ data: DocumentData }> = ({ data
           {data.terms && <p><span className="font-semibold text-slate-700">Terms: </span>{data.terms}</p>}
           {data.notes && <p><span className="font-semibold text-slate-700">Notes: </span>{data.notes}</p>}
         </div>
+
+        {/* Signatures & seals */}
+        <div className="font-sans">
+          <SignOffBlock data={signOff} heading={`For and on behalf of ${company.name}`} accent="#065f46" />
+        </div>
       </div>
 
-      {/* Signature & Seal Footer */}
-      <div className="pt-8 border-t border-slate-200 mt-8 flex justify-between items-end font-sans text-xs text-slate-400">
-        <div>
-          <p>{company.footer || 'Thank you for your patronage.'}</p>
-          <p className="text-[10px] text-slate-300 mt-0.5">{company.website}</p>
-        </div>
-        <div className="text-right">
-          {company.signature ? (
-            <img src={company.signature} alt="Signature" className="h-10 max-w-[140px] object-contain mb-1 ml-auto" />
-          ) : (
-            <div className="h-8"></div>
-          )}
-          <p className="font-semibold text-slate-800 border-t border-slate-300 pt-1 w-44 ml-auto text-center">
-            {company.name} Authorized Signatory
-          </p>
-        </div>
+      {/* Footer */}
+      <div className="pt-6 border-t border-slate-200 mt-8 flex justify-between items-end font-sans text-xs text-slate-400">
+        <p>{company.footer || 'Thank you for your patronage.'}</p>
+        <p className="text-[10px] text-slate-300">{company.website}</p>
       </div>
     </div>
   );

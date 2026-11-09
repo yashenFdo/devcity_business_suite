@@ -12,6 +12,7 @@ import {
   Phone,
   Receipt as ReceiptIcon,
   Send,
+  Share2,
   Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -31,6 +32,7 @@ import { DocumentPreviewRenderer } from '../../components/documents/DocumentPrev
 import { RecordPaymentModal } from '../../components/documents/RecordPaymentModal';
 import { TEMPLATE_OPTIONS } from '../../components/documents/templateOptions';
 import { useDocumentPrint } from '../../components/documents/useDocumentPrint';
+import { ShareDocumentModal } from '../../components/documents/ShareDocumentModal';
 import { paymentMethodLabel } from '../../components/documents/paymentMethods';
 import { toInvoiceDocument } from './invoiceDocument';
 import type { Invoice, TemplateId } from '../../types';
@@ -52,6 +54,7 @@ export const InvoiceView: React.FC = () => {
   const canPay = useCan('payments.record');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [paying, setPaying] = useState<Invoice | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -117,6 +120,9 @@ export const InvoiceView: React.FC = () => {
           )}
           <button type="button" className="btn-secondary" onClick={() => handlePrint()}>
             <Download size={15} /> Download PDF
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => setShareOpen(true)}>
+            <Share2 size={15} /> Share
           </button>
           {canEdit && (
             <Link to={`/invoices/${invoice.id}/edit`} className="btn-secondary">
@@ -283,6 +289,15 @@ export const InvoiceView: React.FC = () => {
       </div>
 
       <RecordPaymentModal invoice={paying} onClose={() => setPaying(null)} />
+      <ShareDocumentModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        collection="invoices"
+        recordId={invoice.id}
+        data={docData}
+        templateId={invoice.templateId}
+        contact={{ name: invoice.customer.name || invoice.customer.company, email: invoice.customer.email, phone: invoice.customer.phone }}
+      />
       <ConfirmModal
         isOpen={voidOpen}
         onClose={() => setVoidOpen(false)}

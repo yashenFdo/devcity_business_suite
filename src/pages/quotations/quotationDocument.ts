@@ -1,6 +1,8 @@
 import { differenceInCalendarDays, isValid, parseISO } from 'date-fns';
-import type { Company, Invoice, Quotation } from '../../types';
+import type { Company, Invoice, Quotation, Stamp } from '../../types';
 import type { DocumentData } from '../../components/documents/documentTypes';
+import { resolveSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
 import { useQuotationsStore } from '../../store/useQuotationsStore';
 import { generateId } from '../../utils/documentNumber';
@@ -12,7 +14,11 @@ import { effectiveQuotationStatus } from '../../utils/insights';
  * snapshot taken when the quotation was saved; branding (logo, signature,
  * colour) always follows the current company settings.
  */
-export const toQuotationDocument = (q: Quotation, company: Company): DocumentData => {
+export const toQuotationDocument = (
+  q: Quotation,
+  company: Company,
+  stamps: Stamp[] = useStampsStore.getState().stamps
+): DocumentData => {
   const snapshot = q.companySnapshot ?? company;
   return {
     documentType: 'quotation',
@@ -44,6 +50,7 @@ export const toQuotationDocument = (q: Quotation, company: Company): DocumentDat
       brandColor: company.brandColor,
     },
     templateId: q.templateId,
+    ...resolveSignOff(q, company, stamps, false, q.date),
   };
 };
 
@@ -104,6 +111,8 @@ export const convertQuotationToInvoice = (q: Quotation, company: Company): Invoi
     terms: 'Payment is due by the date shown above. Late payments may incur a 1.5% monthly service charge.',
     companySnapshot: company,
     fromQuotationId: q.id,
+    // Same people sign the invoice; stamps are applied afresh.
+    signatoryIds: q.signatoryIds,
   });
   useQuotationsStore.getState().markAsConverted(q.id, invoice.id);
   return invoice;

@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { Check, ImagePlus, PenLine, Sparkles, Trash2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Check, ChevronRight, ImagePlus, PenLine, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCompanyStore } from '../../store/useCompanyStore';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
@@ -9,10 +10,9 @@ import { Field } from '../../components/documents/editor/FormSection';
 import { useSaveShortcut, useUnsavedChangesWarning } from '../../components/documents/editor/useEditorGuards';
 import type { Company } from '../../types';
 import { addDays, today } from '../../utils/formatters';
+import { ImageSlot } from '../../components/ui/ImageSlot';
 import { SettingsCard, UnsavedBar } from './SettingsPrimitives';
 
-const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const MAX_BYTES = 512 * 1024;
 const HEX = /^#[0-9a-f]{6}$/i;
 
 const COLOR_PRESETS = [
@@ -25,90 +25,6 @@ const COLOR_PRESETS = [
   { name: 'Crimson', value: '#be123c' },
   { name: 'Bronze', value: '#b45309' },
 ];
-
-/** Validates type, size and that the file really decodes as an image. */
-const readImage = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    if (!ALLOWED_TYPES.includes(file.type)) return reject(new Error('Use a PNG, JPG or WebP image.'));
-    if (file.size > MAX_BYTES) return reject(new Error('Image must be 512 KB or smaller.'));
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read the file.'));
-    reader.onload = () => {
-      const url = String(reader.result);
-      const img = new Image();
-      img.onload = () => resolve(url);
-      img.onerror = () => reject(new Error('This file is not a valid image.'));
-      img.src = url;
-    };
-    reader.readAsDataURL(file);
-  });
-
-const ImageSlot: React.FC<{
-  label: string;
-  hint: string;
-  icon: React.ElementType;
-  value?: string;
-  onChange: (v: string | undefined) => void;
-}> = ({ label, hint, icon: Icon, value, onChange }) => {
-  const input = useRef<HTMLInputElement>(null);
-  const pick = async (file?: File) => {
-    if (!file) return;
-    try {
-      onChange(await readImage(file));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload failed');
-    }
-  };
-  return (
-    <div>
-      <p className="label">{label}</p>
-      <input
-        ref={input}
-        type="file"
-        accept={ALLOWED_TYPES.join(',')}
-        className="hidden"
-        onChange={(e) => {
-          void pick(e.target.files?.[0]);
-          e.target.value = '';
-        }}
-      />
-      {value ? (
-        <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-3">
-          <div className="flex h-16 w-28 items-center justify-center rounded-lg bg-[repeating-conic-gradient(#f1f5f9_0%_25%,#fff_0%_50%)] bg-[length:12px_12px] p-2 ring-1 ring-slate-200">
-            <img src={value} alt={label} className="max-h-full max-w-full object-contain" />
-          </div>
-          <div className="flex-1" />
-          <button type="button" className="btn-sm btn-secondary" onClick={() => input.current?.click()}>
-            Replace
-          </button>
-          <button
-            type="button"
-            className="btn-icon btn-ghost hover:bg-rose-50 hover:text-rose-600"
-            onClick={() => onChange(undefined)}
-            aria-label={`Remove ${label.toLowerCase()}`}
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => input.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            void pick(e.dataTransfer.files?.[0]);
-          }}
-          className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 px-4 py-6 text-center transition-colors hover:border-primary-300 hover:bg-primary-50/30"
-        >
-          <Icon size={22} className="text-slate-400" />
-          <span className="text-[13px] font-medium text-slate-700">Click or drop an image</span>
-          <span className="text-xs text-slate-500">{hint}</span>
-        </button>
-      )}
-    </div>
-  );
-};
 
 const sampleDocument = (company: Company): DocumentData => ({
   documentType: 'invoice',
@@ -202,13 +118,37 @@ export const BrandingSettings: React.FC = () => {
                 <Sparkles size={14} /> Use the official DevCity logo &amp; colour
               </button>
             </div>
-            <ImageSlot
-              label="Authorised signature"
-              hint="Shown on invoices, receipts & quotes"
-              icon={PenLine}
-              value={form.signature}
-              onChange={(v) => set('signature', v)}
-            />
+            {company.signatories?.length ? (
+              <div>
+                <p className="label">Signatures</p>
+                <Link
+                  to="/settings/signatures"
+                  className="flex items-center gap-3 rounded-xl border border-slate-200 p-3.5 transition-colors hover:border-primary-300 hover:bg-primary-50/30"
+                >
+                  <PenLine size={18} className="flex-shrink-0 text-primary-600" />
+                  <span className="flex-1">
+                    <span className="block text-[13px] font-medium text-slate-900">
+                      {company.signatories.length} {company.signatories.length === 1 ? 'signatory' : 'signatories'}
+                    </span>
+                    <span className="block text-xs text-slate-500">Manage in Signatures &amp; stamps</span>
+                  </span>
+                  <ChevronRight size={16} className="text-slate-400" />
+                </Link>
+              </div>
+            ) : (
+              <div>
+                <ImageSlot
+                  label="Authorised signature"
+                  hint="Shown on invoices, receipts & quotes"
+                  icon={PenLine}
+                  value={form.signature}
+                  onChange={(v) => set('signature', v)}
+                />
+                <Link to="/settings/signatures" className="btn-ghost btn-sm -ml-2 mt-2 text-primary-700 hover:bg-primary-50">
+                  Add named signatories &amp; stamps
+                </Link>
+              </div>
+            )}
           </div>
         </SettingsCard>
 

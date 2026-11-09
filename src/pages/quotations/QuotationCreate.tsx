@@ -6,6 +6,9 @@ import { useQuotationsStore } from '../../store/useQuotationsStore';
 import { useInvoicesStore } from '../../store/useInvoicesStore';
 import { useCompanyStore } from '../../store/useCompanyStore';
 import { useCustomersStore } from '../../store/useCustomersStore';
+import { SignOffSection } from '../../components/documents/editor/SignOffSection';
+import { defaultSignOff, pickSignOff, resolveSignOff } from '../../components/documents/signOff';
+import { useStampsStore } from '../../store/useStampsStore';
 import { LineItemsTable } from '../../components/documents/LineItemsTable';
 import { TotalsSection } from '../../components/documents/TotalsSection';
 import { DocumentPreviewRenderer } from '../../components/documents/DocumentPreviewRenderer';
@@ -19,7 +22,7 @@ import { DEFAULT_TEMPLATE } from '../../components/documents/templateOptions';
 import type { DocumentData } from '../../components/documents/documentTypes';
 import { StatusBadge } from '../../components/ui/Badge';
 import { NotFoundState } from '../../components/ui/States';
-import type { Company, Customer, CurrencyCode, DiscountType, LineItem, Quotation, TemplateId } from '../../types';
+import type { Company, Customer, CurrencyCode, DiscountType, LineItem, Quotation, SignOffOptions, TemplateId } from '../../types';
 import { SUPPORTED_CURRENCIES } from '../../types';
 import { generateId, generateQuotationNumber } from '../../utils/documentNumber';
 import { calculateDocumentTotals } from '../../utils/calculations';
@@ -42,6 +45,7 @@ interface QuotationForm {
   taxPercent: number;
   notes: string;
   terms: string;
+  signOff: SignOffOptions;
 }
 
 const VALIDITY_PRESETS = [15, 30, 60, 90];
@@ -81,6 +85,7 @@ const fromQuotation = (q: Quotation): QuotationForm => ({
   taxPercent: q.taxPercent || 0,
   notes: q.notes || '',
   terms: q.terms || '',
+  signOff: pickSignOff(q),
 });
 
 const newQuotation = (company: Company, existingNumbers: string[]): QuotationForm => ({
@@ -100,6 +105,7 @@ const newQuotation = (company: Company, existingNumbers: string[]): QuotationFor
   notes: `Thank you for considering ${company.name}. We look forward to working with you.`,
   terms:
     'This quotation is valid until the date shown above. A 50% mobilisation fee is due on acceptance, with the balance invoiced on delivery. Work outside the agreed scope is quoted separately.',
+  signOff: defaultSignOff(company),
 });
 
 /** Route wrapper: remounts the editor when switching between documents. */
@@ -115,6 +121,7 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
   const updateQuotation = useQuotationsStore((s) => s.updateQuotation);
   const company = useCompanyStore((s) => s.company);
   const customers = useCustomersStore((s) => s.customers);
+  const stamps = useStampsStore((s) => s.stamps);
   const location = useLocation();
   const existing = editId ? quotations.find((q) => q.id === editId) : undefined;
   const linkedInvoice = useInvoicesStore((s) =>
@@ -174,6 +181,7 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
     acceptedDate: existing?.acceptedDate,
     company, // saving re-snapshots the current company profile, so preview it as-is
     templateId: form.templateId,
+    ...resolveSignOff(form.signOff, company, stamps, false, form.date),
   };
 
   const handlePrint = useDocumentPrint(printRef, form.quotationNumber || 'Quotation');
@@ -208,6 +216,7 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
       notes: form.notes,
       terms: form.terms,
       companySnapshot: company,
+      ...pickSignOff(form.signOff),
     };
     try {
       if (existing) {
@@ -430,6 +439,15 @@ const QuotationEditor: React.FC<{ editId?: string }> = ({ editId }) => {
               </div>
             )}
           </FormSection>
+
+          <SignOffSection
+            step={6}
+            value={form.signOff}
+            onChange={(v) => set('signOff', v)}
+            documentType="quotation"
+            documentDate={form.date}
+            isPaid={false}
+          />
         </>
       }
       preview={<DocumentPreviewRenderer ref={printRef} data={preview} templateId={form.templateId} />}

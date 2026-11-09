@@ -7,6 +7,8 @@ import { ResetPasswordScreen } from '../../pages/auth/ResetPasswordScreen';
 import { OnboardingScreen } from '../../pages/auth/OnboardingScreen';
 import { InviteScreen } from '../../pages/auth/InviteScreen';
 import { SetupRequiredScreen } from '../../pages/auth/SetupRequiredScreen';
+import { SharedDocumentPage } from '../../pages/share/SharedDocumentPage';
+import { SHARE_PATH } from '../../cloud/sharing';
 import { IdleWatcher } from './IdleWatcher';
 import { LogoMark } from '../brand/Logo';
 
@@ -18,6 +20,10 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const status = useSession((s) => s.status);
   const { pathname } = useLocation();
   const inviteToken = pathname.match(/^\/invite\/([A-Za-z0-9]{32,128})\/?$/)?.[1];
+  const shareToken = pathname.match(SHARE_PATH)?.[1];
+
+  // Public shared-document links work for everyone, signed in or not.
+  if (shareToken) return <SharedDocumentPage key={shareToken} token={shareToken} />;
 
   if (status === 'loading') {
     return (

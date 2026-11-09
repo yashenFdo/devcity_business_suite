@@ -1,6 +1,8 @@
 import React from 'react';
 import type { DocumentData } from '../documentTypes';
 import { formatCurrency, formatDate, getStatusLabel } from '../../../utils/formatters';
+import { SignOffBlock } from '../SignOffBlock';
+import { withSignOffFallbacks } from '../signOff';
 
 export const CorporateProTemplate: React.FC<{ data: DocumentData }> = ({ data }) => {
   const { company, customer, currencySymbol } = data;
@@ -8,6 +10,7 @@ export const CorporateProTemplate: React.FC<{ data: DocumentData }> = ({ data })
   const isQuotation = data.documentType === 'quotation';
   const isReceipt = data.documentType === 'receipt';
   const isBill = data.documentType === 'bill';
+  const signOff = withSignOffFallbacks(data);
 
   const docTitle =
     data.documentType === 'quotation' ? 'COMMERCIAL QUOTATION' :
@@ -241,15 +244,11 @@ export const CorporateProTemplate: React.FC<{ data: DocumentData }> = ({ data })
                 <p className="text-[10px] text-slate-400 mt-1">Designation & Date</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">{company.name} Authorization</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Date of Acceptance</p>
                 <div className="h-10 border-b border-slate-400 mt-2 flex items-end">
-                  {company.signature ? (
-                    <img src={company.signature} alt="Authorised signature" className="max-h-8 object-contain" />
-                  ) : (
-                    <span className="font-mono text-xs text-slate-700">Authorised Signatory</span>
-                  )}
+                  <span className="font-mono text-xs text-slate-700">{data.acceptedDate ? formatDate(data.acceptedDate) : ''}</span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Date: {formatDate(data.date)}</p>
+                <p className="text-[10px] text-slate-400 mt-1">DD / MM / YYYY</p>
               </div>
             </div>
           </div>
@@ -259,6 +258,11 @@ export const CorporateProTemplate: React.FC<{ data: DocumentData }> = ({ data })
         <div className="px-8 py-4 text-xs text-slate-500 space-y-1">
           {data.terms && <p><span className="font-semibold text-slate-700">Terms:</span> {data.terms}</p>}
           {data.notes && <p><span className="font-semibold text-slate-700">Special Notes:</span> {data.notes}</p>}
+        </div>
+
+        {/* Sign-off: signatories and stamps */}
+        <div className="px-8 pb-6">
+          <SignOffBlock data={signOff} heading={`For and on behalf of ${company.name}`} />
         </div>
       </div>
 
