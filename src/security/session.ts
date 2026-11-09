@@ -11,6 +11,7 @@ import type { Role } from './permissions';
 import { useCompanyStore, companyFromWorkspace } from '../store/useCompanyStore';
 import { DEFAULT_POLICY, useAccessStore, type SecurityPolicy } from '../store/useAccessStore';
 import { loadAuditLog, logAudit, useAuditStore } from '../store/useAuditStore';
+import { loadStamps, useStampsStore } from '../store/useStampsStore';
 
 const ACTIVE_WS_KEY = 'devcity-active-workspace';
 const LAST_EMAIL_KEY = 'devcity-last-email';
@@ -38,6 +39,7 @@ const resetWorkspaceState = () => {
   useCompanyStore.setState(useCompanyStore.getInitialState(), true);
   useAccessStore.setState(useAccessStore.getInitialState(), true);
   useAuditStore.setState(useAuditStore.getInitialState(), true);
+  useStampsStore.setState(useStampsStore.getInitialState(), true);
 };
 
 // ─── Workspaces ───────────────────────────────────────────────
@@ -115,13 +117,14 @@ export const enterWorkspace = async (wsId: string) => {
     user: { ...s.user, role: summary.role },
   });
   try {
-    const [row] = await Promise.all([loadWorkspaceRow(wsId), loadMembers(wsId), loadAllRecords(wsId)]);
+    const [row] = await Promise.all([loadWorkspaceRow(wsId), loadMembers(wsId), loadAllRecords(wsId), loadStamps(wsId)]);
     if (summary.role === 'admin') await Promise.all([loadAdminData(wsId), loadAuditLog(wsId)]);
     localStorage.setItem(ACTIVE_WS_KEY, wsId);
     subscribeWorkspace(wsId, {
       onMembersChanged: () => void onMembersChanged(),
       onWorkspaceChanged: () => void loadWorkspaceRow(wsId).catch(() => undefined),
       onJoinRequestsChanged: (isNew) => void refreshJoinQueue(isNew),
+      onStampsChanged: () => void loadStamps(wsId),
     });
     void supabase.rpc('touch_last_seen', { p_workspace: wsId });
     useSession.setState({ status: 'ready', workspace: { id: row.id, name: row.name } });

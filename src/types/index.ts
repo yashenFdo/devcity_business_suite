@@ -107,6 +107,53 @@ export interface Company {
   /** Template pre-selected for new documents. */
   defaultTemplate?: TemplateId;
   footer?: string;
+  /** People who can sign documents (managed by admins). */
+  signatories?: Signatory[];
+  /** Signatories pre-selected on new documents (max 5). */
+  defaultSignatoryIds?: string[];
+}
+
+// ─── Signatures & stamps ─────────────────────────────────────
+export interface Signatory {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  /** Signature image (data URL). */
+  signature?: string;
+}
+
+/** Ink colour is fixed by kind: company = blue, personal/role = black, paid = green. */
+export type StampKind = 'company' | 'personal';
+export type StampShape = 'round' | 'rect';
+
+export interface Stamp {
+  id: string;
+  kind: StampKind;
+  /** Owner of a personal stamp (auth user id). Company stamps have none. */
+  ownerId?: string;
+  shape: StampShape;
+  /** Main text: company name, or e.g. "APPROVED". */
+  title: string;
+  /** Second line: registration number, or the person's role. */
+  subtitle?: string;
+  /** Small lines: contact details, a name, etc. */
+  lines?: string[];
+  /** Print the date the stamp is applied. */
+  showDate?: boolean;
+}
+
+/** Sign-off choices stored on each document. */
+export interface SignOffOptions {
+  /** Up to 5 signatories, in display order. */
+  signatoryIds?: string[];
+  /** Stamps applied to the document. */
+  stampIds?: string[];
+  /** Show the green PAID stamp. Undefined = automatic when fully paid. */
+  paidStamp?: boolean;
+  /** Date printed in stamps (defaults to the document date). */
+  stampDate?: string;
 }
 
 // ─── Document Totals ─────────────────────────────────────────
@@ -122,7 +169,7 @@ export interface DocumentTotals {
 }
 
 // ─── Quotation ───────────────────────────────────────────────
-export interface Quotation {
+export interface Quotation extends SignOffOptions {
   id: string;
   quotationNumber: string;
   date: string;
@@ -154,7 +201,7 @@ export interface Quotation {
 }
 
 // ─── Invoice ─────────────────────────────────────────────────
-export interface Invoice {
+export interface Invoice extends SignOffOptions {
   id: string;
   invoiceNumber: string;
   date: string;
@@ -189,7 +236,7 @@ export interface Invoice {
 }
 
 // ─── Bill ────────────────────────────────────────────────────
-export interface Bill {
+export interface Bill extends SignOffOptions {
   id: string;
   billNumber: string;
   date: string;
@@ -223,7 +270,7 @@ export interface Bill {
 }
 
 // ─── Receipt ─────────────────────────────────────────────────
-export interface Receipt {
+export interface Receipt extends SignOffOptions {
   id: string;
   receiptNumber: string;
   date: string;

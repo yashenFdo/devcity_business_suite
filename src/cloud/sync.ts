@@ -187,6 +187,7 @@ interface RealtimeHandlers {
   onWorkspaceChanged: () => void;
   /** Admins only (RLS): someone asked to join, or a request was handled. */
   onJoinRequestsChanged: (isNew: boolean) => void;
+  onStampsChanged: () => void;
 }
 
 export const subscribeWorkspace = (ws: string, handlers: RealtimeHandlers) => {
@@ -215,6 +216,9 @@ export const subscribeWorkspace = (ws: string, handlers: RealtimeHandlers) => {
     )
     .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests', filter: `workspace_id=eq.${ws}` }, (payload) =>
       handlers.onJoinRequestsChanged(payload.eventType === 'INSERT')
+    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'stamps', filter: `workspace_id=eq.${ws}` }, () =>
+      handlers.onStampsChanged()
     )
     .subscribe();
 };

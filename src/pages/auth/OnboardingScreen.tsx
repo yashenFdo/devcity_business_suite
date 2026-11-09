@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowRight, Building2, Clock, KeyRound, Loader2, LogOut, Mail, RefreshCw, UsersRound, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Logo } from '../../components/brand/Logo';
+import { DevCityFooterCompact } from '../../components/brand/DevCityFooter';
 import { Avatar } from '../../components/ui/Avatar';
 import { useSession } from '../../security/sessionState';
 import { ROLE_META } from '../../security/permissions';
@@ -279,6 +280,9 @@ export const OnboardingScreen: React.FC = () => {
         <p className="mt-10 flex items-center justify-center gap-2 text-xs text-slate-400">
           <UsersRound size={14} /> Got an email invitation? Open its link and it joins you automatically.
         </p>
+        <div className="mt-12">
+          <DevCityFooterCompact />
+        </div>
       </main>
     </div>
   );

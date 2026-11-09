@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { CommandPalette } from './CommandPalette';
+import { DevCityFooter } from '../brand/DevCityFooter';
 import { lockWorkspace, refreshJoinQueue } from '../../security/session';
 import { useSession } from '../../security/sessionState';
 
@@ -67,9 +68,12 @@ export const AppLayout: React.FC = () => {
           {fullBleed ? (
             <Outlet />
           ) : (
-            <div key={pathname} className="px-4 py-6 animate-fade-in md:px-8 md:py-8">
-              <Outlet />
-            </div>
+            <>
+              <div key={pathname} className="px-4 py-6 animate-fade-in md:px-8 md:py-8">
+                <Outlet />
+              </div>
+              <DevCityFooter />
+            </>
           )}
           </Suspense>
         </main>

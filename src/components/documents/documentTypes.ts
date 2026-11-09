@@ -1,4 +1,4 @@
-import type { Company, Customer, LineItem, DocumentType, TemplateId } from '../../types';
+import type { Company, Customer, LineItem, DocumentType, Signatory, Stamp, TemplateId } from '../../types';
 
 /** Normalised data every document template renders from. */
 export interface DocumentData {
@@ -38,4 +38,9 @@ export interface DocumentData {
   referenceNumber?: string;
   company: Company;
   templateId?: TemplateId;
+  /** Resolved sign-off (see resolveSignOff). */
+  signatories?: Signatory[];
+  stamps?: Stamp[];
+  showPaidStamp?: boolean;
+  stampDate?: string;
 }

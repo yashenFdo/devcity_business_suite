@@ -4,7 +4,11 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
-const MIGRATION = readFileSync(new URL('../migrations/0001_workspaces.sql', import.meta.url), 'utf8');
+import { readdirSync } from 'node:fs';
+const MIGRATIONS = readdirSync(new URL('../migrations/', import.meta.url))
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .map((f) => readFileSync(new URL(`../migrations/${f}`, import.meta.url), 'utf8'));
 const db = new PGlite();
 let failures = 0;
 const ok = (c, m) => {
@@ -23,8 +27,8 @@ await db.exec(`
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on functions to anon, authenticated;
 `);
-await db.exec(MIGRATION);
-console.log('Migration applied');
+for (const m of MIGRATIONS) await db.exec(m);
+console.log(`${MIGRATIONS.length} migrations applied`);
 
 const U = {
   alice: '00000000-0000-0000-0000-00000000000a', // creates workspace (admin)
@@ -127,6 +131,37 @@ ok((await as('alice', `select phone from public.workspace_members where user_id=
 ok(await fails('bob', `update public.workspace_members set role='admin' where user_id=$1`, [U.bob]), 'no direct member table edits');
 ok((await as('bob', `select email from public.profiles where id=$1`, [U.carol])).rows.length === 1, 'colleague profiles visible');
 ok((await as('mallory', `select email from public.profiles where id=$1`, [U.bob])).rows.length === 0, 'outsiders cannot see profiles');
+
+console.log('Stamps');
+const cs = (await as('alice', `insert into public.stamps (workspace_id, kind, data) values ($1, 'company', '{"title":"DevCity"}') returning id`, [ws])).rows[0].id;
+ok(!!cs, 'admin creates the company stamp');
+ok(await fails('bob', `insert into public.stamps (workspace_id, kind, data) values ($1, 'company', '{}')`, [ws]), 'editor cannot create a company stamp');
+const bs = (await as('bob', `insert into public.stamps (workspace_id, kind, owner_id, data) values ($1, 'personal', $2, '{"title":"APPROVED"}') returning id`, [ws, U.bob])).rows[0].id;
+ok(!!bs, 'editor creates a personal stamp');
+ok(await fails('bob', `insert into public.stamps (workspace_id, kind, owner_id, data) values ($1, 'personal', $2, '{}')`, [ws, U.alice]), "cannot create a stamp in someone else's name");
+ok((await as('carol', `select count(*)::int c from public.stamps`)).rows[0].c === 2, 'members can see stamps to apply them');
+ok((await as('alice', `update public.stamps set data='{"title":"X"}' where id=$1`, [bs])).affectedRows === 0, "admin can't edit someone's personal stamp");
+ok((await as('bob', `update public.stamps set data='{"title":"X"}' where id=$1`, [cs])).affectedRows === 0, "editor can't edit the company stamp");
+ok(await fails('carol', `insert into public.stamps (workspace_id, kind, owner_id, data) values ($1, 'personal', $2, '{}')`, [ws, U.carol]), 'viewer cannot create stamps');
+ok((await as('mallory', `select * from public.stamps`)).rows.length === 0, 'outsiders see no stamps');
+
+console.log('Share links');
+await as('bob', `insert into public.records (workspace_id, collection, id, number, data) values ($1,'invoices','s1','DEV-INV-2026-050','{}')`, [ws]);
+const shareToken = (await as('carol', `select public.create_share_link($1, 'invoices', 's1', 'DEV-INV-2026-050', '{"number":"DEV-INV-2026-050"}', 7) t`, [ws])).rows[0].t;
+ok(shareToken.length === 64, 'member creates a share link');
+ok(await fails('mallory', `select public.create_share_link($1, 'invoices', 's1', 'x', '{}', 7)`, [ws]), 'outsider cannot create share links');
+ok(await fails('bob', `select public.create_share_link($1, 'invoices', 'nope', 'x', '{}', 7)`, [ws], 'not found'), 'cannot share a document that does not exist');
+const opened = (await as(null, `select * from public.get_shared_document($1)`, [shareToken])).rows[0];
+ok(opened?.status === 'active' && opened.snapshot.number === 'DEV-INV-2026-050', 'anyone with the link can open it');
+ok((await as(null, `select * from public.get_shared_document($1)`, ['f'.repeat(64)])).rows.length === 0, 'wrong token reveals nothing');
+ok(await fails('bob', `select token_hash from public.shared_documents`), 'token hash is not readable');
+ok(await fails('bob', `select snapshot from public.shared_documents`), 'snapshots are not readable via the table');
+ok((await as('alice', `select view_count from public.shared_documents`)).rows[0].view_count === 1, 'views are counted');
+const linkId = (await as('alice', `select id from public.shared_documents`)).rows[0].id;
+ok(await fails('bob', `select public.revoke_share_link($1)`, [linkId]), "editor can't revoke a colleague's link");
+await as('alice', `select public.revoke_share_link($1)`, [linkId]);
+ok((await as(null, `select * from public.get_shared_document($1)`, [shareToken])).rows[0].status === 'revoked', 'revoked link stops working');
+ok(await fails(null, `select * from public.shared_documents`), 'anon cannot list links');
 
 console.log('Admin safety & leaving');
 ok(await fails('alice', `select public.update_member($1, $2, 'viewer')`, [ws, U.alice], 'at least one administrator'), 'last admin cannot demote self');

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileCheck2, Lock, ShieldCheck, Users } from 'lucide-react';
 import { Logo } from '../../components/brand/Logo';
+import { DevCityFooterCompact } from '../../components/brand/DevCityFooter';
 
 const FEATURES = [
   {
@@ -98,7 +99,7 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       <div className="flex flex-1 items-center justify-center py-10">
         <div className="w-full max-w-[400px] animate-slide-up">{children}</div>
       </div>
-      <p className="text-center text-xs text-slate-400">© {new Date().getFullYear()} DevCity Pvt Ltd · devcity.us</p>
+      <DevCityFooterCompact />
     </main>
   </div>
 );

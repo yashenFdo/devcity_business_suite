@@ -2,6 +2,9 @@ import React from 'react';
 import type { DocumentData } from '../documentTypes';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
 import { amountInWords } from '../../../utils/amountInWords';
+import { SignOffBlock } from '../SignOffBlock';
+import { PaidStampSVG } from '../stamps/StampSVG';
+import { companySignatories } from '../signOff';
 
 // ============================================================
 // Executive — the flagship DevCity template.
@@ -79,6 +82,14 @@ export const ExecutiveTemplate: React.FC<{ data: DocumentData }> = ({ data }) =>
   const amountDue = isReceipt ? data.amountPaid ?? data.total : data.balanceDue ?? data.total;
   const status = STATUS_STYLES[data.status];
   const isPaid = data.status === 'paid' || isReceipt;
+  // Fallbacks keep older documents looking right: default signatory and automatic PAID stamp.
+  const signOff: DocumentData = {
+    ...data,
+    signatories: data.signatories ?? companySignatories(company).slice(0, 1),
+    stampDate: data.stampDate || data.date,
+    // Receipts already show PAID in their amount panel.
+    showPaidStamp: !isReceipt && (data.showPaidStamp ?? (isPaid && (isInvoice || isBill))),
+  };
 
   const companyAddress = joinAddress([
     company.address.street,
@@ -261,14 +272,6 @@ export const ExecutiveTemplate: React.FC<{ data: DocumentData }> = ({ data }) =>
                 )}
               </div>
               <div className="relative w-[290px] text-[12px]">
-                {isPaid && isInvoice && (
-                  <span
-                    className="absolute -left-[110px] top-2 rotate-[-12deg] rounded-md border-[2.5px] border-emerald-600/70 px-3 py-1 text-[18px] font-black tracking-[0.2em] text-emerald-600/70"
-                    aria-hidden="true"
-                  >
-                    PAID
-                  </span>
-                )}
                 <div className="flex justify-between py-1.5 text-slate-600">
                   <span>Subtotal</span>
                   <span className="font-medium text-slate-800">{money(data.subtotal)}</span>
@@ -325,12 +328,9 @@ export const ExecutiveTemplate: React.FC<{ data: DocumentData }> = ({ data }) =>
                   </p>
                   <p className="mt-2.5 max-w-[420px] text-[11px] italic text-slate-600">{amountInWords(amountDue, cur)}</p>
                 </div>
-                <span
-                  className="rotate-[-10deg] rounded-md border-[2.5px] border-emerald-600/70 px-3 py-1 text-[20px] font-black tracking-[0.2em] text-emerald-600/70"
-                  aria-hidden="true"
-                >
-                  PAID
-                </span>
+                <div className="flex-shrink-0" aria-hidden="true">
+                  <PaidStampSVG date={data.stampDate || data.date} size={150} rotate={-9} />
+                </div>
               </div>
               <dl className="grid grid-cols-2 gap-x-10 gap-y-4 px-6 py-5 text-[12px]">
                 <div>
@@ -422,40 +422,19 @@ export const ExecutiveTemplate: React.FC<{ data: DocumentData }> = ({ data }) =>
           </section>
         )}
 
-        {/* ── Sign-off ─────────────────────────────────────── */}
-        {isQuote ? (
-          <section className="mt-10 grid grid-cols-2 gap-12" style={{ breakInside: 'avoid' }}>
-            <div>
-              <Label>For {company.name}</Label>
-              <div className="flex h-[54px] items-end">
-                {company.signature && <img src={company.signature} alt="" className="max-h-[48px] max-w-[160px] object-contain" />}
-              </div>
-              <div className="border-t border-slate-300 pt-1.5 text-[10.5px] text-slate-500">Authorised signatory</div>
+        {/* ── Sign-off: signatories (up to 5) and stamps ─────── */}
+        <SignOffBlock data={signOff} heading={`For ${company.name}`} />
+        {isQuote && (
+          <section className="mt-8 w-1/2 pr-6" style={{ breakInside: 'avoid' }}>
+            <Label>Accepted by {customer?.company || customer?.name || 'client'}</Label>
+            <div className="flex h-[54px] items-end">
+              {data.acceptanceSignature && <img src={data.acceptanceSignature} alt="" className="max-h-[48px] max-w-[160px] object-contain" />}
             </div>
-            <div>
-              <Label>Accepted by {customer?.company || customer?.name || 'client'}</Label>
-              <div className="flex h-[54px] items-end">
-                {data.acceptanceSignature && (
-                  <img src={data.acceptanceSignature} alt="" className="max-h-[48px] max-w-[160px] object-contain" />
-                )}
-              </div>
-              <div className="flex justify-between border-t border-slate-300 pt-1.5 text-[10.5px] text-slate-500">
-                <span>{data.clientSignerName || 'Name & signature'}</span>
-                <span>Date: {data.acceptedDate ? formatDate(data.acceptedDate) : '____________'}</span>
-              </div>
+            <div className="flex justify-between border-t border-slate-300 pt-1.5 text-[10.5px] text-slate-500">
+              <span>{data.clientSignerName || 'Name & signature'}</span>
+              <span>Date: {data.acceptedDate ? formatDate(data.acceptedDate) : '____________'}</span>
             </div>
           </section>
-        ) : (
-          (isInvoice || isReceipt) && company.signature && (
-            <section className="mt-10 flex justify-end" style={{ breakInside: 'avoid' }}>
-              <div className="w-[200px] text-center">
-                <img src={company.signature} alt="" className="mx-auto max-h-[48px] max-w-[160px] object-contain" />
-                <div className="mt-1 border-t border-slate-300 pt-1.5 text-[10.5px] text-slate-500">
-                  Authorised signatory · {company.name}
-                </div>
-              </div>
-            </section>
-          )
         )}
 
         <div className="flex-1" />

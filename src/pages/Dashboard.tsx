@@ -28,7 +28,8 @@ import { Avatar } from '../components/ui/Avatar';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { buildAlerts, joinRequestAlerts, effectiveBillStatus, effectiveInvoiceStatus, effectiveQuotationStatus, type AlertTone } from '../utils/insights';
 
-const SERIES = { invoiced: '#1F5BFF', collected: '#0d9488' };
+const SERIES = { invoiced: '#1F5BFF', collected: '#0d9488', paidOut: '#e8590c' };
+const SERIES_LABEL: Record<keyof typeof SERIES, string> = { invoiced: 'Invoiced', collected: 'Collected', paidOut: 'Paid out' };
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -81,7 +82,7 @@ const ChartTooltip: React.FC<ChartTooltipProps> = ({ active, payload, label, sym
       {payload.map((p) => (
         <p key={p.dataKey} className="flex items-center gap-2 text-slate-600">
           <span className="h-2 w-2 rounded-sm" style={{ background: SERIES[p.dataKey as keyof typeof SERIES] }} />
-          <span className="w-16 capitalize">{p.dataKey}</span>
+          <span className="w-16">{SERIES_LABEL[p.dataKey as keyof typeof SERIES]}</span>
           <span className="font-medium text-slate-900 tabular">{formatCurrency(p.value, sym)}</span>
         </p>
       ))}
@@ -105,7 +106,7 @@ export const Dashboard: React.FC = () => {
   const home = company.currency;
   // Totals only combine documents in the company's default currency.
   const inHome = <T extends { currency?: string }>(d: T) => (d.currency || 'USD') === home;
-  const foreignCount = [...invoices, ...receipts, ...quotations].filter((d) => !inHome(d)).length;
+  const foreignCount = [...invoices, ...receipts, ...quotations, ...bills].filter((d) => !inHome(d)).length;
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -117,7 +118,18 @@ export const Dashboard: React.FC = () => {
     const rec = receipts.filter(inHome);
     const collected = (m: string) => rec.filter((r) => r.date.startsWith(m)).reduce((t, r) => t + r.amount, 0);
     const pipelineQuotes = quotations.filter(inHome).filter((q) => effectiveQuotationStatus(q) === 'sent');
-    const payables = bills.filter(inHome).filter((b) => ['unpaid', 'overdue'].includes(effectiveBillStatus(b)));
+    // Purchase bills: everything not cancelled and not fully paid is still owed (drafts included).
+    const openBills = bills
+      .filter(inHome)
+      .map((b) => ({ b, s: effectiveBillStatus(b) }))
+      .filter(({ b, s }) => s !== 'cancelled' && s !== 'paid' && (b.balanceDue ?? b.total) > 0);
+    const owed = (b: (typeof bills)[number]) => b.balanceDue ?? Math.max(0, b.total - (b.amountPaid || 0));
+    const toPay = openBills.reduce((t, { b }) => t + owed(b), 0);
+    const paidOut = (m: string) =>
+      bills
+        .filter(inHome)
+        .filter((b) => b.status !== 'cancelled' && (b.amountPaid || 0) > 0 && (b.paymentDate || b.date).startsWith(m))
+        .reduce((t, b) => t + (b.amountPaid || 0), 0);
     return {
       outstanding,
       openCount: live.filter(({ i }) => i.balanceDue > 0).length,
@@ -127,7 +139,13 @@ export const Dashboard: React.FC = () => {
       collectedLast: collected(lastMonth),
       pipeline: pipelineQuotes.reduce((t, q) => t + q.total, 0),
       pipelineCount: pipelineQuotes.length,
-      payables: payables.reduce((t, b) => t + (b.balanceDue ?? b.total), 0),
+      payables: toPay,
+      billCount: openBills.length,
+      billsOverdue: openBills.filter(({ s }) => s === 'overdue').length,
+      billDrafts: openBills.filter(({ s }) => s === 'draft').length,
+      net: outstanding - toPay,
+      paidOutThis: paidOut(thisMonth),
+      paidOutLast: paidOut(lastMonth),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, receipts, quotations, bills, home]);
@@ -142,10 +160,13 @@ export const Dashboard: React.FC = () => {
           .filter((i) => inHome(i) && i.status !== 'draft' && i.status !== 'cancelled' && i.date.startsWith(key))
           .reduce((t, i) => t + i.total, 0),
         collected: receipts.filter((r) => inHome(r) && r.date.startsWith(key)).reduce((t, r) => t + r.amount, 0),
+        paidOut: bills
+          .filter((b) => inHome(b) && b.status !== 'cancelled' && (b.amountPaid || 0) > 0 && (b.paymentDate || b.date).startsWith(key))
+          .reduce((t, b) => t + (b.amountPaid || 0), 0),
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoices, receipts, home]);
+  }, [invoices, receipts, bills, home]);
 
   const joinRequests = useAccessStore((s) => s.joinRequests);
   const alerts = useMemo(
@@ -177,7 +198,7 @@ export const Dashboard: React.FC = () => {
   const showChecklist = canCreate && doneCount < checklist.length;
 
   const delta = stats.collectedLast > 0 ? ((stats.collectedThis - stats.collectedLast) / stats.collectedLast) * 100 : null;
-  const hasChartData = monthly.some((m) => m.invoiced || m.collected);
+  const hasChartData = monthly.some((m) => m.invoiced || m.collected || m.paidOut);
 
   return (
     <div className="page">
@@ -201,30 +222,56 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* KPIs: what's owed to you, what you owe, and the difference */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Kpi
-          label="Outstanding"
+          label="To receive"
           value={formatCurrency(stats.outstanding, sym)}
-          sub={`${stats.openCount} open invoice${stats.openCount === 1 ? '' : 's'}`}
+          sub={
+            stats.overdueCount ? (
+              <span className="font-medium text-rose-600">
+                {formatCurrency(stats.overdueAmount, sym)} overdue · {stats.overdueCount} invoice{stats.overdueCount === 1 ? '' : 's'}
+              </span>
+            ) : (
+              `${stats.openCount} open invoice${stats.openCount === 1 ? '' : 's'} · nothing overdue`
+            )
+          }
           icon={FileText}
           tone="bg-primary-50 text-primary-600"
           to="/invoices"
         />
         <Kpi
-          label="Overdue"
-          value={formatCurrency(stats.overdueAmount, sym)}
-          sub={stats.overdueCount ? <span className="font-medium text-rose-600">{stats.overdueCount} need follow-up</span> : 'Nothing overdue'}
-          icon={AlertCircle}
-          tone={stats.overdueCount ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}
-          to="/invoices"
+          label="To pay"
+          value={formatCurrency(stats.payables, sym)}
+          sub={
+            stats.billsOverdue ? (
+              <span className="font-medium text-rose-600">{stats.billsOverdue} overdue bill{stats.billsOverdue === 1 ? '' : 's'}</span>
+            ) : (
+              `${stats.billCount} open bill${stats.billCount === 1 ? '' : 's'}${stats.billDrafts ? ` · ${stats.billDrafts} draft` : ''}`
+            )
+          }
+          icon={Banknote}
+          tone={stats.billsOverdue ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}
+          to="/bills"
         />
         <Kpi
-          label="Collected this month"
+          label="Net position"
+          value={`${stats.net < 0 ? '−' : ''}${formatCurrency(Math.abs(stats.net), sym)}`}
+          sub={
+            <span className={stats.net >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-rose-600'}>
+              {stats.net >= 0 ? 'Receivables cover open bills' : 'Open bills exceed receivables'}
+            </span>
+          }
+          icon={AlertCircle}
+          tone={stats.net >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}
+          to="/"
+        />
+        <Kpi
+          label="Money in this month"
           value={formatCurrency(stats.collectedThis, sym)}
           sub={
             delta === null ? (
-              'No payments last month'
+              'No payments received last month'
             ) : (
               <span className={delta >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-rose-600'}>
                 {delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(0)}% vs last month
@@ -234,6 +281,14 @@ export const Dashboard: React.FC = () => {
           icon={CheckCircle2}
           tone="bg-emerald-50 text-emerald-600"
           to="/receipts"
+        />
+        <Kpi
+          label="Money out this month"
+          value={formatCurrency(stats.paidOutThis, sym)}
+          sub={`${formatCurrency(stats.paidOutLast, sym)} paid out last month`}
+          icon={Receipt}
+          tone="bg-orange-50 text-orange-600"
+          to="/bills"
         />
         <Kpi
           label="Open quotations"
@@ -250,7 +305,7 @@ export const Dashboard: React.FC = () => {
         <section className="card xl:col-span-2">
           <div className="card-header">
             <div>
-              <h2 className="card-title">Invoiced vs collected</h2>
+              <h2 className="card-title">Cash flow</h2>
               <p className="card-subtitle">Last 6 months · {home}</p>
             </div>
             <div className="flex items-center gap-4">
@@ -260,6 +315,9 @@ export const Dashboard: React.FC = () => {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: SERIES.collected }} /> Collected
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm" style={{ background: SERIES.paidOut }} /> Paid out
                 </span>
               </div>
               <div className="segmented">
@@ -276,10 +334,10 @@ export const Dashboard: React.FC = () => {
             {!hasChartData ? (
               <div className="flex h-[260px] flex-col items-center justify-center text-center">
                 <p className="text-sm font-medium text-slate-700">No activity yet</p>
-                <p className="mt-1 max-w-xs text-xs text-slate-500">Issued invoices and recorded payments will appear here month by month.</p>
+                <p className="mt-1 max-w-xs text-xs text-slate-500">Invoices, payments received and bills paid will appear here month by month.</p>
               </div>
             ) : view === 'chart' ? (
-              <div className="h-[260px]" role="img" aria-label="Bar chart of invoiced and collected amounts for the last six months">
+              <div className="h-[260px]" role="img" aria-label="Bar chart of invoiced, collected and paid-out amounts for the last six months">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthly} barGap={2} barCategoryGap="28%">
                     <CartesianGrid vertical={false} stroke="#eef2f7" />
@@ -292,8 +350,9 @@ export const Dashboard: React.FC = () => {
                       tickFormatter={(v: number) => compact(v, sym)}
                     />
                     <Tooltip cursor={{ fill: 'rgb(148 163 184 / 0.12)' }} content={<ChartTooltip sym={sym} />} />
-                    <Bar dataKey="invoiced" fill={SERIES.invoiced} radius={[4, 4, 0, 0]} maxBarSize={26} />
-                    <Bar dataKey="collected" fill={SERIES.collected} radius={[4, 4, 0, 0]} maxBarSize={26} />
+                    <Bar dataKey="invoiced" fill={SERIES.invoiced} radius={[4, 4, 0, 0]} maxBarSize={22} />
+                    <Bar dataKey="collected" fill={SERIES.collected} radius={[4, 4, 0, 0]} maxBarSize={22} />
+                    <Bar dataKey="paidOut" fill={SERIES.paidOut} radius={[4, 4, 0, 0]} maxBarSize={22} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -304,6 +363,7 @@ export const Dashboard: React.FC = () => {
                     <th>Month</th>
                     <th className="text-right">Invoiced</th>
                     <th className="text-right">Collected</th>
+                    <th className="text-right">Paid out</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -312,6 +372,7 @@ export const Dashboard: React.FC = () => {
                       <td>{m.month}</td>
                       <td className="text-right tabular">{formatCurrency(m.invoiced, sym)}</td>
                       <td className="text-right tabular">{formatCurrency(m.collected, sym)}</td>
+                      <td className="text-right tabular">{formatCurrency(m.paidOut, sym)}</td>
                     </tr>
                   ))}
                 </tbody>
