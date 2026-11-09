@@ -235,7 +235,6 @@ export const InvoicesList: React.FC = () => {
         onConfirm={() => {
           if (!deleteTarget) return;
           deleteInvoice(deleteTarget.id);
-          toast.success(`${deleteTarget.invoiceNumber} deleted`);
         }}
         title={`Delete ${deleteTarget?.invoiceNumber ?? 'invoice'}?`}
         message="This permanently removes the invoice. Linked receipts are kept. This cannot be undone."

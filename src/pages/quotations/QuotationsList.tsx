@@ -295,7 +295,6 @@ export const QuotationsList: React.FC = () => {
         onConfirm={() => {
           if (!deleteTarget) return;
           deleteQuotation(deleteTarget.id);
-          toast.success(`${deleteTarget.quotationNumber} deleted`);
         }}
         title={`Delete ${deleteTarget?.quotationNumber ?? 'quotation'}?`}
         message="This permanently removes the quotation. Any invoice created from it is kept. This cannot be undone."

@@ -314,7 +314,6 @@ export const InvoiceView: React.FC = () => {
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => {
           deleteInvoice(invoice.id);
-          toast.success(`${invoice.invoiceNumber} deleted`);
           navigate('/invoices');
         }}
         title={`Delete ${invoice.invoiceNumber}?`}

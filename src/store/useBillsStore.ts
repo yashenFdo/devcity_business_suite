@@ -6,6 +6,7 @@ import { assertCan } from '../security/sessionState';
 import { logAudit } from './useAuditStore';
 import { connectCollection, nowIso, resolveNumber } from './persistence';
 import { deleteRecord, pushRecord } from '../cloud/sync';
+import { showUndoToast } from '../components/ui/undoToast';
 
 type NewBill = Omit<Bill, 'id' | 'billNumber' | 'createdAt' | 'updatedAt'> & { billNumber?: string };
 
@@ -14,6 +15,8 @@ interface BillsStore {
   addBill: (data: NewBill) => Bill;
   updateBill: (id: string, data: Partial<Bill>) => void;
   deleteBill: (id: string) => void;
+  /** Delete several at once with a single Undo. */
+  deleteBills: (ids: string[]) => void;
   duplicateBill: (id: string) => Bill | undefined;
   getBillById: (id: string) => Bill | undefined;
 }
@@ -58,12 +61,37 @@ export const useBillsStore = create<BillsStore>()((set, get) => {
       save(id);
       if (existing) logAudit('document', 'Updated vendor bill', existing.billNumber);
     },
+    deleteBills: (ids) => {
+      assertCan('documents.delete');
+      const removed = get().bills.filter((x) => ids.includes(x.id));
+      if (!removed.length) return;
+      set((state) => ({ bills: state.bills.filter((x) => !ids.includes(x.id)) }));
+      removed.forEach((x) => {
+        deleteRecord('bills', x.id);
+        logAudit('document', 'Deleted vendor bill', x.billNumber);
+      });
+      const label = removed.length === 1 ? `${removed[0].billNumber} deleted` : `${removed.length} vendor bills deleted`;
+      showUndoToast(label, () => {
+        set((state) => ({ bills: [...removed, ...state.bills.filter((x) => !ids.includes(x.id))] }));
+        removed.forEach((x) => {
+          save(x.id);
+          logAudit('document', 'Restored vendor bill', x.billNumber);
+        });
+      });
+    },
     deleteBill: (id) => {
       assertCan('documents.delete');
       const existing = get().bills.find((b) => b.id === id);
       set((state) => ({ bills: state.bills.filter((b) => b.id !== id) }));
       deleteRecord('bills', id);
-      if (existing) logAudit('document', 'Deleted vendor bill', existing.billNumber);
+      if (existing) {
+        logAudit('document', 'Deleted vendor bill', existing.billNumber);
+        showUndoToast(`${existing.billNumber} deleted`, () => {
+          set((state) => ({ bills: [existing, ...state.bills.filter((x) => x.id !== existing.id)] }));
+          save(existing.id);
+          logAudit('document', 'Restored vendor bill', existing.billNumber);
+        });
+      }
     },
     duplicateBill: (id) => {
       assertCan('documents.create');

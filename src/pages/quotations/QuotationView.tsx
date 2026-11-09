@@ -355,7 +355,6 @@ export const QuotationView: React.FC = () => {
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => {
           deleteQuotation(quotation.id);
-          toast.success(`${quotation.quotationNumber} deleted`);
           navigate('/quotations');
         }}
         title={`Delete ${quotation.quotationNumber}?`}

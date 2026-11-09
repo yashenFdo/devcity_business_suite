@@ -9,6 +9,7 @@ import { buildAlerts, joinRequestAlerts, type AlertTone } from '../../utils/insi
 import { useAccessStore } from '../../store/useAccessStore';
 import { useCan } from '../../security/sessionState';
 import { lockWorkspace } from '../../security/session';
+import { SaveStatus } from './SaveStatus';
 
 const SECTIONS: { path: string; label: string }[] = [
   { path: '/quotations', label: 'Quotations' },
@@ -25,6 +26,7 @@ const SETTINGS_PAGES: Record<string, string> = {
   '/settings/branding': 'Branding & documents',
   '/settings/team': 'Team & access',
   '/settings/security': 'Account & security',
+  '/settings/signatures': 'Signatures & stamps',
   '/settings/activity': 'Activity log',
 };
 
@@ -160,6 +162,8 @@ export const Header: React.FC<{ onMenuClick: () => void; onSearch: () => void }>
       <button type="button" onClick={onSearch} className="btn-icon btn-ghost md:hidden" aria-label="Search">
         <Search size={17} />
       </button>
+
+      <SaveStatus />
 
       <Notifications />
 

@@ -144,7 +144,6 @@ export const CustomersList: React.FC = () => {
     try {
       deleteCustomer(deleteTarget.id);
       if (selectedId === deleteTarget.id) closeClient();
-      toast.success(`${clientLabel(deleteTarget)} deleted`);
     } catch (err) {
       if (!(err instanceof PermissionError)) toast.error('Could not delete the client.');
     }

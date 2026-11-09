@@ -273,7 +273,6 @@ export const BillsList: React.FC = () => {
         onConfirm={() => {
           if (!deleteTarget) return;
           deleteBill(deleteTarget.id);
-          toast.success(`${deleteTarget.billNumber} deleted`);
         }}
         title={`Delete ${deleteTarget?.billNumber ?? 'bill'}?`}
         message="This permanently removes the bill and its payment record. This cannot be undone."

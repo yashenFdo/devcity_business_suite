@@ -214,7 +214,6 @@ export const ReceiptsList: React.FC = () => {
         onConfirm={() => {
           if (!deleteTarget) return;
           deleteReceipt(deleteTarget.id);
-          toast.success(`${deleteTarget.receiptNumber} deleted`);
         }}
         title={`Delete ${deleteTarget?.receiptNumber ?? 'receipt'}?`}
         message={

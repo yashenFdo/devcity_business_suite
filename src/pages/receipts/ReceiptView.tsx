@@ -293,7 +293,6 @@ export const ReceiptView: React.FC = () => {
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => {
           deleteReceipt(receipt.id);
-          toast.success(`${receipt.receiptNumber} deleted`);
           navigate('/receipts');
         }}
         title={`Delete ${receipt.receiptNumber}?`}

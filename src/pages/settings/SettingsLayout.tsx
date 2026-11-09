@@ -41,7 +41,7 @@ export const SettingsLayout: React.FC = () => {
                   to={item.to}
                   end={item.end}
                   className={({ isActive }) =>
-                    `flex items-start gap-3 whitespace-nowrap rounded-lg px-3 py-2 transition-colors ${
+                    `flex items-start gap-3 whitespace-nowrap rounded-lg px-3 py-2 transition-colors lg:whitespace-normal ${
                       isActive ? 'bg-white shadow-xs ring-1 ring-slate-200' : 'hover:bg-slate-100'
                     }`
                   }

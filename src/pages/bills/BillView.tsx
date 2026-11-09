@@ -307,7 +307,6 @@ export const BillView: React.FC = () => {
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => {
           deleteBill(bill.id);
-          toast.success(`${bill.billNumber} deleted`);
           navigate('/bills');
         }}
         title={`Delete ${bill.billNumber}?`}

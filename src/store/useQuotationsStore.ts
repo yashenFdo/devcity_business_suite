@@ -6,6 +6,7 @@ import { assertCan } from '../security/sessionState';
 import { logAudit } from './useAuditStore';
 import { connectCollection, nowIso, resolveNumber } from './persistence';
 import { deleteRecord, pushRecord } from '../cloud/sync';
+import { showUndoToast } from '../components/ui/undoToast';
 
 type NewQuotation = Omit<Quotation, 'id' | 'quotationNumber' | 'createdAt' | 'updatedAt'> & {
   quotationNumber?: string;
@@ -16,6 +17,8 @@ interface QuotationsStore {
   addQuotation: (data: NewQuotation) => Quotation;
   updateQuotation: (id: string, data: Partial<Quotation>) => void;
   deleteQuotation: (id: string) => void;
+  /** Delete several at once with a single Undo. */
+  deleteQuotations: (ids: string[]) => void;
   duplicateQuotation: (id: string) => Quotation | undefined;
   getQuotationById: (id: string) => Quotation | undefined;
   markAsConverted: (id: string, invoiceId: string) => void;
@@ -61,12 +64,37 @@ export const useQuotationsStore = create<QuotationsStore>()((set, get) => {
       save(id);
       if (existing) logAudit('document', 'Updated quotation', existing.quotationNumber);
     },
+    deleteQuotations: (ids) => {
+      assertCan('documents.delete');
+      const removed = get().quotations.filter((x) => ids.includes(x.id));
+      if (!removed.length) return;
+      set((state) => ({ quotations: state.quotations.filter((x) => !ids.includes(x.id)) }));
+      removed.forEach((x) => {
+        deleteRecord('quotations', x.id);
+        logAudit('document', 'Deleted quotation', x.quotationNumber);
+      });
+      const label = removed.length === 1 ? `${removed[0].quotationNumber} deleted` : `${removed.length} quotations deleted`;
+      showUndoToast(label, () => {
+        set((state) => ({ quotations: [...removed, ...state.quotations.filter((x) => !ids.includes(x.id))] }));
+        removed.forEach((x) => {
+          save(x.id);
+          logAudit('document', 'Restored quotation', x.quotationNumber);
+        });
+      });
+    },
     deleteQuotation: (id) => {
       assertCan('documents.delete');
       const existing = get().quotations.find((q) => q.id === id);
       set((state) => ({ quotations: state.quotations.filter((q) => q.id !== id) }));
       deleteRecord('quotations', id);
-      if (existing) logAudit('document', 'Deleted quotation', existing.quotationNumber);
+      if (existing) {
+        logAudit('document', 'Deleted quotation', existing.quotationNumber);
+        showUndoToast(`${existing.quotationNumber} deleted`, () => {
+          set((state) => ({ quotations: [existing, ...state.quotations.filter((x) => x.id !== existing.id)] }));
+          save(existing.id);
+          logAudit('document', 'Restored quotation', existing.quotationNumber);
+        });
+      }
     },
     duplicateQuotation: (id) => {
       assertCan('documents.create');

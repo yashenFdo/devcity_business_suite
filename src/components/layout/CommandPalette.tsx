@@ -22,13 +22,14 @@ import { useBillsStore } from '../../store/useBillsStore';
 import { useReceiptsStore } from '../../store/useReceiptsStore';
 import { useCustomersStore } from '../../store/useCustomersStore';
 import { lockWorkspace } from '../../security/session';
-import { can } from '../../security/sessionState';
+import { can, useSession } from '../../security/sessionState';
+import { getRecent } from './recentItems';
 import { formatCurrency } from '../../utils/formatters';
 import { CREATE_ACTIONS } from './navigation';
 
 interface PaletteItem {
   id: string;
-  group: 'Actions' | 'Go to' | 'Documents' | 'Clients';
+  group: 'Recent' | 'Actions' | 'Go to' | 'Documents' | 'Clients';
   label: string;
   hint?: string;
   icon: React.ElementType;
@@ -53,6 +54,7 @@ const PaletteDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const bills = useBillsStore((s) => s.bills);
   const receipts = useReceiptsStore((s) => s.receipts);
   const customers = useCustomersStore((s) => s.customers);
+  const workspaceId = useSession((s) => s.workspace?.id);
 
   useEffect(() => inputRef.current?.focus(), []);
 
@@ -141,14 +143,22 @@ const PaletteDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }));
 
     const q = query.trim().toLowerCase();
-    if (!q) return [...actions, ...pages, ...docs.slice(0, 5)];
+    if (!q) {
+      const prefix: Record<string, string> = { invoices: 'i-', quotations: 'q-', receipts: 'r-', bills: 'b-' };
+      const recent = getRecent(workspaceId)
+        .map((r) => docs.find((d) => d.id === prefix[r.kind] + r.id))
+        .filter((d): d is PaletteItem => !!d)
+        .slice(0, 5)
+        .map((d) => ({ ...d, id: `recent-${d.id}`, group: 'Recent' as const }));
+      return [...recent, ...actions, ...pages, ...(recent.length ? [] : docs.slice(0, 5))];
+    }
     const terms = q.split(/\s+/);
     const match = (it: PaletteItem) => {
       const hay = `${it.label} ${it.keywords} ${it.hint ?? ''}`.toLowerCase();
       return terms.every((t) => hay.includes(t));
     };
     return [...actions, ...pages, ...docs, ...clients].filter(match).slice(0, 40);
-  }, [query, quotations, invoices, receipts, bills, customers, navigate]);
+  }, [query, quotations, invoices, receipts, bills, customers, navigate, workspaceId]);
 
   const safeActive = Math.min(active, Math.max(0, items.length - 1));
 
@@ -233,7 +243,7 @@ const PaletteDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <item.icon size={15} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className={`block truncate text-[13px] font-medium ${item.group === 'Documents' ? 'font-mono' : ''}`}>
+                    <span className={`block truncate text-[13px] font-medium ${item.group === 'Documents' || item.group === 'Recent' ? 'font-mono' : ''}`}>
                       {item.label}
                     </span>
                     {item.hint && <span className="block truncate text-xs text-slate-500">{item.hint}</span>}
@@ -259,7 +269,7 @@ const PaletteDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <span className="kbd">↵</span> open
           </span>
           <span className="ml-auto flex items-center gap-1.5">
-            <ShieldCheck size={12} className="text-emerald-600" /> Searches only this encrypted workspace
+            <ShieldCheck size={12} className="text-emerald-600" /> Searches only this workspace
           </span>
         </div>
       </div>

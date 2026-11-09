@@ -6,6 +6,7 @@ import { assertCan } from '../security/sessionState';
 import { logAudit } from './useAuditStore';
 import { connectCollection, nowIso, resolveNumber } from './persistence';
 import { deleteRecord, pushRecord } from '../cloud/sync';
+import { showUndoToast } from '../components/ui/undoToast';
 
 type NewInvoice = Omit<Invoice, 'id' | 'invoiceNumber' | 'createdAt' | 'updatedAt'> & { invoiceNumber?: string };
 
@@ -14,6 +15,8 @@ interface InvoicesStore {
   addInvoice: (data: NewInvoice) => Invoice;
   updateInvoice: (id: string, data: Partial<Invoice>) => void;
   deleteInvoice: (id: string) => void;
+  /** Delete several at once with a single Undo. */
+  deleteInvoices: (ids: string[]) => void;
   duplicateInvoice: (id: string) => Invoice | undefined;
   getInvoiceById: (id: string) => Invoice | undefined;
   markAsPaid: (id: string, amountPaid: number) => void;
@@ -60,12 +63,37 @@ export const useInvoicesStore = create<InvoicesStore>()((set, get) => {
       save(id);
       if (existing) logAudit('document', 'Updated invoice', existing.invoiceNumber);
     },
+    deleteInvoices: (ids) => {
+      assertCan('documents.delete');
+      const removed = get().invoices.filter((x) => ids.includes(x.id));
+      if (!removed.length) return;
+      set((state) => ({ invoices: state.invoices.filter((x) => !ids.includes(x.id)) }));
+      removed.forEach((x) => {
+        deleteRecord('invoices', x.id);
+        logAudit('document', 'Deleted invoice', x.invoiceNumber);
+      });
+      const label = removed.length === 1 ? `${removed[0].invoiceNumber} deleted` : `${removed.length} invoices deleted`;
+      showUndoToast(label, () => {
+        set((state) => ({ invoices: [...removed, ...state.invoices.filter((x) => !ids.includes(x.id))] }));
+        removed.forEach((x) => {
+          save(x.id);
+          logAudit('document', 'Restored invoice', x.invoiceNumber);
+        });
+      });
+    },
     deleteInvoice: (id) => {
       assertCan('documents.delete');
       const existing = get().invoices.find((i) => i.id === id);
       set((state) => ({ invoices: state.invoices.filter((inv) => inv.id !== id) }));
       deleteRecord('invoices', id);
-      if (existing) logAudit('document', 'Deleted invoice', existing.invoiceNumber);
+      if (existing) {
+        logAudit('document', 'Deleted invoice', existing.invoiceNumber);
+        showUndoToast(`${existing.invoiceNumber} deleted`, () => {
+          set((state) => ({ invoices: [existing, ...state.invoices.filter((x) => x.id !== existing.id)] }));
+          save(existing.id);
+          logAudit('document', 'Restored invoice', existing.invoiceNumber);
+        });
+      }
     },
     duplicateInvoice: (id) => {
       assertCan('documents.create');

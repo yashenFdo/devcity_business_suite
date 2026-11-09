@@ -105,22 +105,22 @@ export const AvailableBalanceCard: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="rounded-xl bg-white/[0.06] px-3.5 py-3 ring-1 ring-white/10">
+        <div className="-mx-1 grid grid-cols-3 gap-1.5 sm:mx-0 sm:gap-3">
+          <div className="rounded-xl bg-white/[0.06] px-2.5 py-2.5 ring-1 ring-white/10 sm:px-3.5 sm:py-3">
             <p className="text-[11px] text-slate-400">Opening</p>
-            <p className="mt-1 text-sm font-semibold tabular">{formatCurrency(cash.opening, sym)}</p>
+            <p className="mt-1 whitespace-nowrap text-[13px] font-semibold tabular sm:text-sm">{formatCurrency(cash.opening, sym)}</p>
           </div>
-          <div className="rounded-xl bg-white/[0.06] px-3.5 py-3 ring-1 ring-white/10">
+          <div className="rounded-xl bg-white/[0.06] px-2.5 py-2.5 ring-1 ring-white/10 sm:px-3.5 sm:py-3">
             <p className="flex items-center gap-1 text-[11px] text-slate-400">
               <ArrowDownLeft size={12} className="text-emerald-300" /> Received
             </p>
-            <p className="mt-1 text-sm font-semibold text-emerald-300 tabular">+{formatCurrency(cash.received, sym)}</p>
+            <p className="mt-1 whitespace-nowrap text-[13px] font-semibold text-emerald-300 tabular sm:text-sm">+{formatCurrency(cash.received, sym)}</p>
           </div>
-          <div className="rounded-xl bg-white/[0.06] px-3.5 py-3 ring-1 ring-white/10">
+          <div className="rounded-xl bg-white/[0.06] px-2.5 py-2.5 ring-1 ring-white/10 sm:px-3.5 sm:py-3">
             <p className="flex items-center gap-1 text-[11px] text-slate-400">
               <ArrowUpRight size={12} className="text-orange-300" /> Paid out
             </p>
-            <p className="mt-1 text-sm font-semibold text-orange-300 tabular">−{formatCurrency(cash.paidOut, sym)}</p>
+            <p className="mt-1 whitespace-nowrap text-[13px] font-semibold text-orange-300 tabular sm:text-sm">−{formatCurrency(cash.paidOut, sym)}</p>
           </div>
         </div>
 
